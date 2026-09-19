@@ -26,9 +26,25 @@ from schemas import ExternalEvent
 
 log = logging.getLogger("external.gcal")
 
-# calendar.events covers reading and writing events. freebusy needs no scope of
-# its own -- it is served under the same grant.
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+# Two scopes, and both are needed. Verified against the real API, which is the
+# only way this gets found:
+#
+#   calendar.events    read and write events. Enough for events.list and
+#                      events.insert, and NOT enough for anything else.
+#   calendar.readonly  freebusy.query. It refuses calendar.events alone with
+#                      403 "Request had insufficient authentication scopes",
+#                      which reads like a project misconfiguration rather than
+#                      a missing scope.
+#
+# Deliberately not the full "calendar" scope, which would also grant deleting
+# calendars outright. This pair is read-everything plus write-events-only.
+#
+# Changing this list invalidates an existing token.json: delete it and re-run
+# scripts/setup_google_oauth.py, or every call fails on the scope check.
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.readonly",
+]
 
 
 def _rfc3339(moment: datetime) -> str:
@@ -137,7 +153,12 @@ class GoogleCalendar(CalendarBackend):
             # invalid_grant is by far the most likely failure and its message is
             # opaque, so name the cause rather than making someone search it.
             hint = ""
-            if "invalid_grant" in str(exc):
+            if "insufficient authentication scopes" in str(exc):
+                hint = (
+                    " -- token.json was granted fewer scopes than SCOPES asks "
+                    "for. Delete it and re-run scripts/setup_google_oauth.py"
+                )
+            elif "invalid_grant" in str(exc):
                 hint = (
                     " -- a Testing-mode refresh token expires after 7 days; "
                     "re-run scripts/setup_google_oauth.py"

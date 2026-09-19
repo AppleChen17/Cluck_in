@@ -252,8 +252,13 @@ worth re-running the script the morning of a demo regardless.
 - **All-day events are skipped.** They have no time and no offset, the
   `ExternalEvent` contract requires a full date-time, and `docs/data-contracts.md`
   defers all-day handling. Coercing one to midnight would block the whole day.
-- The scope requested is `calendar.events` only. It cannot read your Gmail, your
-  Drive or your contacts.
+- Two scopes are requested: `calendar.events` (read and write events) and
+  `calendar.readonly` (which `freebusy.query` requires — it rejects
+  `calendar.events` alone with a `403` whose message says nothing about
+  scopes). Deliberately not the full `calendar` scope, which would also allow
+  deleting calendars. Neither can reach your Gmail, Drive or contacts.
+- **Changing the scope list invalidates an existing `token.json`.** Delete it
+  and re-run the setup script; the error message from this module says so.
 - Revoke it any time at <https://myaccount.google.com/permissions>.
 
 ---
