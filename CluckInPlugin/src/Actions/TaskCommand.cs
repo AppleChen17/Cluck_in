@@ -10,6 +10,14 @@ namespace Loupedeck.CluckInPlugin
                 description: "Select current task",
                 groupName: "CluckIn")
         {
+            MainController.ModeChanged += () => this.ActionImageChanged();
+            IdleChickenAnimation.StatisticsChanged += this.OnIdleChanged;
+        }
+
+        private void OnIdleChanged(){
+            if(MainController.CurrentMode == CluckInMode.Idle){
+                this.ActionImageChanged();
+            }
         }
 
         protected override void RunCommand(String actionParameter)
@@ -21,6 +29,9 @@ namespace Loupedeck.CluckInPlugin
             String actionParameter,
             PluginImageSize imageSize)
         {
+            if(MainController.CurrentMode == CluckInMode.Idle){
+                return IdleChickenAnimation.Statistic(v => v.PatCount, "PATS");
+            }
             return "Task";
         }
     }

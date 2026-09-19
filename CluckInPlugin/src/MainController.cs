@@ -155,6 +155,10 @@ public static class MainController{
     public static event Action<CluckInEvent> ActionRequested;
 
     public static void HandleKeyEvent(Int32 keyId){
+        // Idle statistics keys are read-only; Focus dispatch below is unchanged.
+        if(CurrentMode == CluckInMode.Idle && keyId is 4 or 6 or 7 or 8 or 9){
+            return;
+        }
         PluginLog.Info($"CluckIn received key {keyId}");
 
         switch(keyId){
@@ -337,11 +341,11 @@ public static class MainController{
 
         RequestAction(
             2,
-            CluckInAction.FeedChicken
+            CluckInAction.PetChicken
         );
 
         SendInputEvent(
-            "FEED_CHICKEN",
+            "PET_CHICKEN",
             new Dictionary<String, Object>(),
             2
         );
@@ -351,11 +355,11 @@ public static class MainController{
         if(CurrentMode == CluckInMode.Idle){
             RequestAction(
                 3,
-                CluckInAction.PetChicken
+                CluckInAction.FeedChicken
             );
 
             SendInputEvent(
-                "PET_CHICKEN",
+                "FEED_CHICKEN",
                 new Dictionary<String, Object>(),
                 3
             );

@@ -25,11 +25,13 @@ namespace Loupedeck.CluckInPlugin
         // This method is called when the plugin is loaded.
         public override void Load()
         {
+            IdleChickenAnimation.Start();
         }
 
         // This method is called when the plugin is unloaded.
         public override void Unload()
         {
+            IdleChickenAnimation.Stop();
         }
     }
 }

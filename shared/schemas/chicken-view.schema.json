@@ -5,23 +5,53 @@
   "description": "GET /view snapshot for Main / logitech. Push frames/{chicken} to displayKey (5, or 6 when paused).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["mood", "chicken", "fps", "loop", "displayKey", "nestIcon", "deskEmpty", "feedCount"],
+  "required": [
+    "mood",
+    "chicken",
+    "fps",
+    "loop",
+    "displayKey",
+    "nestIcon",
+    "deskEmpty",
+    "feedCount",
+    "patCount",
+    "successfulFeedCount",
+    "totalFocusSeconds"
+  ],
   "properties": {
     "mood": {
       "type": "string",
-      "enum": ["idle", "focused", "thinking", "feed", "pet", "paused", "tired"]
+      "enum": [
+        "idle",
+        "focused",
+        "thinking",
+        "feed",
+        "pet",
+        "paused",
+        "tired"
+      ]
     },
     "chicken": {
       "type": "string",
       "description": "PNG filename under src/chicken/frames/. Draw on displayKey.",
       "pattern": "^[a-z]+_[0-9]{2}\\.png$"
     },
-    "fps": { "type": "integer", "minimum": 1 },
-    "loop": { "type": "boolean" },
-    "frameDir": { "type": "string" },
+    "fps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "loop": {
+      "type": "boolean"
+    },
+    "frameDir": {
+      "type": "string"
+    },
     "displayKey": {
       "type": "integer",
-      "enum": [5, 6],
+      "enum": [
+        5,
+        6
+      ],
       "description": "LCD key that should show chicken. 5 = chick; 6 = chick in nest (paused)."
     },
     "nestIcon": {
@@ -34,7 +64,52 @@
       "const": "desk_empty.png",
       "description": "Empty workstation. Draw on key 5 when mood is paused (chick is on key 6)."
     },
-    "feedCount": { "type": "integer", "minimum": 0 },
-    "chickenUrl": { "type": "string" }
+    "feedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "chickenUrl": {
+      "type": "string"
+    },
+    "patCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "successfulFeedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "totalFocusSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "idleCrop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
   }
 }

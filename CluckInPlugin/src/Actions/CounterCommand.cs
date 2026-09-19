@@ -24,7 +24,7 @@ namespace Loupedeck.CluckInPlugin
         {
             return MainController.CurrentMode == CluckInMode.Focus
                 ? "WORK"
-                : "IDLE";
+                : "FOCUS";
         }
 
         private void OnModeChanged()

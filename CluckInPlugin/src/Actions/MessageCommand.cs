@@ -6,7 +6,7 @@ namespace Loupedeck.CluckInPlugin
     {
         public MessageCommand()
             : base(
-                displayName: "Messages / Feed",
+                displayName: "Messages / Pet",
                 description: "Context-sensitive message or pet action",
                 groupName: "CluckIn")
         {
@@ -24,7 +24,7 @@ namespace Loupedeck.CluckInPlugin
         {
             return MainController.CurrentMode == CluckInMode.Focus
                 ? "Messages"
-                : "Feed";
+                : "PET";
         }
 
         private void OnModeChanged()

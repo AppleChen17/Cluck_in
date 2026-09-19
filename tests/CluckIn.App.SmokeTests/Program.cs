@@ -1,7 +1,14 @@
+using System.IO;
 using CluckIn.App.Interfaces;
 using CluckIn.App.Managers;
 using CluckIn.App.Models;
 using CluckIn.App.Services;
+
+// Isolate test progress delivery and persistence from the user profile.
+var progressTestPath = Path.Combine(Path.GetTempPath(), $"cluckin-smoke-{Guid.NewGuid():N}.json");
+Environment.SetEnvironmentVariable("CLUCKIN_FOCUS_OUTBOX_PATH", progressTestPath);
+Environment.SetEnvironmentVariable("CLUCKIN_CHICKEN_URL", "http://127.0.0.1:1/");
+AppDomain.CurrentDomain.ProcessExit += (_, _) => { if (File.Exists(progressTestPath)) File.Delete(progressTestPath); };
 
 var assertions = 0;
 void Check(bool condition, string name)
@@ -92,6 +99,8 @@ Check(agent.GetActiveWorkspace()?.Id == "coding", "Invalid duration does not cha
 agent.StopFocus();
 Check(!(await agent.GetContextAsync()).FocusModeEnabled && timer.GetCurrentSession().Status == FocusSessionStatus.Stopped, "Stop disables mode");
 Console.WriteLine($"Passed {assertions} Desktop Agent checks.");
+ProgressTrackingChecks.Run();
+await ProgressTrackingChecks.CheckDeliveryAsync();
 await ViewModelChecks.RunAsync();
 await TaskChecks.RunAsync();
 await InterventionChecks.RunAsync();

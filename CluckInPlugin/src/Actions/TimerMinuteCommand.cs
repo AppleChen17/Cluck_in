@@ -9,8 +9,16 @@ public class TimerMinuteCommand : PluginDynamicCommand{
             description: "Select and display focus timer min",
             groupName: "CluckIn")
     {
+        MainController.ModeChanged += () => this.ActionImageChanged();
+        IdleChickenAnimation.StatisticsChanged += this.OnIdleChanged;
         MainController.FocusTimerChanged +=
             this.OnStateChanged;
+    }
+
+    private void OnIdleChanged(){
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            this.ActionImageChanged();
+        }
     }
 
     protected override void RunCommand(
@@ -23,6 +31,10 @@ public class TimerMinuteCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            return IdleChickenAnimation.FocusTime(1);
+        }
+
         var label =
             MainController.CurrentFocusTimerField ==
                 FocusTimerField.Minutes
