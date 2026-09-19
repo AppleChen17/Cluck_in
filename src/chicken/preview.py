@@ -7,11 +7,12 @@ from tkinter import ttk
 
 from PIL import Image, ImageTk
 
-from state_machine import FPS, FRAMES_DIR, ChickenAnim
+from state_machine import FPS, FRAMES_DIR, HOUSE_FPS, HOUSE_MOODS, ChickenAnim
 
 KEY = 96
 GAP = 6
-# 九宮格 1–9 由左到右、由上到下。第 5 格雞、第 6 格巢。
+# 九宮格 1–9 由左到右、由上到下。第 4 格樹幹、第 5 格雞、第 6 格巢。
+HOUSE_KEY = 3
 CHICKEN_KEY = 4
 NEST_KEY = 5
 KEY_BG = (231, 240, 200, 255)
@@ -65,6 +66,8 @@ class PreviewApp:
         desk_src = Image.open(desk_path).convert("RGBA") if desk_path.exists() else None
         self._desk_photo = ImageTk.PhotoImage(_key_image(desk_src))
 
+        self.keys[HOUSE_KEY].configure(image=self._blank)
+
         bar = ttk.Frame(root)
         bar.pack(pady=8)
         actions = [
@@ -90,6 +93,8 @@ class PreviewApp:
 
     def _delay(self) -> int:
         fps = max(FPS.get(self.anim.mood, 2), 1)
+        if self.anim.mood in HOUSE_MOODS:
+            fps = max(fps, HOUSE_FPS)
         return int(1000 / fps)
 
     def loop(self) -> None:
@@ -102,12 +107,24 @@ class PreviewApp:
         extra = f"  nest feed={view['feedCount']}"
         self.status.set(f"{view['mood']}  ·  {view['fps']} fps{extra}")
         key = int(view.get("displayKey", 5))
-        self.file_name.set(f"{view['chicken']}  ·  nest={view['nestIcon']} @{key}")
+        self.file_name.set(
+            f"{view['chicken']}  ·  house={view.get('houseIcon') or ''}  nest={view['nestIcon']} @{key}"
+        )
         path = FRAMES_DIR / view["chicken"]
         if not path.exists():
             return
         image = Image.open(path).convert("RGBA")
         photo = ImageTk.PhotoImage(_key_image(image))
+        house_name = view.get("houseIcon") or ""
+        if house_name:
+            house_path = FRAMES_DIR / house_name
+            if house_path.exists():
+                house_img = Image.open(house_path).convert("RGBA")
+                house_photo = ImageTk.PhotoImage(_key_image(house_img))
+                self.photos[HOUSE_KEY] = house_photo
+                self.keys[HOUSE_KEY].configure(image=house_photo)
+        else:
+            self.keys[HOUSE_KEY].configure(image=self._blank)
         if key == 6:
             self.photos[CHICKEN_KEY] = self._desk_photo
             self.keys[CHICKEN_KEY].configure(image=self._desk_photo)

@@ -10,8 +10,13 @@ FRAMES_DIR = Path(__file__).resolve().parent / "frames"
 MOODS = ("idle", "start", "focused", "thinking", "feed", "pet", "paused", "tired")
 ONESHOT_MOODS = frozenset({"feed", "pet"})
 NEST_MOODS = frozenset({"focused"})  # 雞畫在第六格巢裡
-# 書桌+鳥巢只存在番茄鐘場景；idle / feed 沒有巢。
+# 書桌只在番茄鐘場景；鳥巢在 idle / feed / 番茄鐘都放第六格。
 SESSION_MOODS = frozenset({"start", "focused", "thinking", "pet", "paused"})
+HOUSE_MOODS = frozenset({"idle", "feed"})  # 樹幹+蛋只在第四格、閒置場景
+NEST_ICON_MOODS = SESSION_MOODS | HOUSE_MOODS
+HOUSE_FPS = 8
+# 01_0 … 01_7 各一幀，01_8 重複八幀
+HOUSE_CYCLE = tuple(range(8)) + (8,) * 8
 
 def _frame_count(mood: str, fallback: int) -> int:
     n = len(list(FRAMES_DIR.glob(f"{mood}_*.png")))
@@ -50,6 +55,8 @@ class ChickenAnim:
         self.mood = "idle"
         self._return_to = "idle"
         self.frame = 0
+        self.house_frame = 0
+        self._tick_accum = 0
         self._oneshot_left = 0
         self.feed_count = 0
 
@@ -87,10 +94,12 @@ class ChickenAnim:
         in_nest = self.mood in NEST_MOODS
         if in_nest:
             nest_icon = filename
-        elif self.mood in SESSION_MOODS:
+        elif self.mood in NEST_ICON_MOODS:
             nest_icon = "nest_icon.png"
         else:
             nest_icon = ""
+        house_on = self.mood in HOUSE_MOODS
+        house_idx = HOUSE_CYCLE[self.house_frame] if house_on else 0
         return {
             "mood": self.mood,
             "chicken": filename,
@@ -100,6 +109,8 @@ class ChickenAnim:
             "displayKey": 6 if in_nest else 5,
             "nestIcon": nest_icon,
             "deskEmpty": "desk_empty.png",
+            "houseIcon": f"house_{house_idx:02d}.png" if house_on else "",
+            "houseFps": HOUSE_FPS if house_on else 0,
             "feedCount": self.feed_count,
         }
 
@@ -109,6 +120,7 @@ class ChickenAnim:
         self.mood = mood
         self._return_to = mood if mood not in ONESHOT_MOODS else self._return_to
         self.frame = 0
+        self._tick_accum = 0
         self._oneshot_left = 0
 
     def _oneshot(self, mood: str, ticks: int, return_to: str | None = None) -> None:
@@ -118,9 +130,18 @@ class ChickenAnim:
             self._return_to = self.mood
         self.mood = mood
         self.frame = 0
+        self._tick_accum = 0
         self._oneshot_left = ticks
 
     def _tick(self) -> None:
+        house_on = self.mood in HOUSE_MOODS
+        if house_on:
+            self.house_frame = (self.house_frame + 1) % len(HOUSE_CYCLE)
+        tick_hz = HOUSE_FPS if house_on else FPS[self.mood]
+        self._tick_accum += FPS[self.mood]
+        if self._tick_accum < tick_hz:
+            return
+        self._tick_accum -= tick_hz
         count = FRAME_COUNTS[self.mood]
         self.frame = (self.frame + 1) % count
         if self._oneshot_left <= 0:

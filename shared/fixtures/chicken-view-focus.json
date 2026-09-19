@@ -7,5 +7,7 @@
   "displayKey": 6,
   "nestIcon": "focused_00.png",
   "deskEmpty": "desk_empty.png",
+  "houseIcon": "",
+  "houseFps": 0,
   "feedCount": 1
 }

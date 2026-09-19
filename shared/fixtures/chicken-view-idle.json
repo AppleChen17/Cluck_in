@@ -5,7 +5,9 @@
   "loop": true,
   "frameDir": "src/chicken/frames",
   "displayKey": 5,
-  "nestIcon": "",
+  "nestIcon": "nest_icon.png",
   "deskEmpty": "desk_empty.png",
+  "houseIcon": "house_00.png",
+  "houseFps": 8,
   "feedCount": 0
 }

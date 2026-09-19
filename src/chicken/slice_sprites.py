@@ -12,7 +12,16 @@ FREE_SHEET = ROOT / "Free Chicken Sprites.png"
 NEST_SHEET = ROOT / "Egg_And_Nest.png"
 DESK_SHEET = ROOT / "work_station.png"
 MILK_SHEET = ROOT / "Milk and grass item Simple.png"
+HOUSE_SHEET = ROOT / "Trees, stumps and bushes.png"
+EGG_SHEET = ROOT / "Egg_Spritesheet.png"
 FRAMES = ROOT / "frames"
+# 最下排第 3 個樹幹（左起兩顆小樁之後）
+HOUSE_BOX = (38, 99, 56, 111)
+HOUSE_SCALE = 0.45  # 目前樹幹再縮成 1/2
+HOUSE_LIFT = 4
+EGG_ROW = 1  # 01_0 … 01_8
+EGG_COLS = 9
+EGG_SIT = 4  # 蛋往下坐進樹幹頂
 
 TILE = 16
 SCALE = 2  # 16 -> 32，雞是原本的 1/2，方鍵才畫得下愛心
@@ -41,10 +50,10 @@ def _scale(tile: Image.Image) -> Image.Image:
     return tile.resize((TILE * SCALE, TILE * SCALE), Image.Resampling.NEAREST)
 
 
-def _bottom(tile: Image.Image) -> Image.Image:
+def _bottom(tile: Image.Image, lift: int = 0) -> Image.Image:
     canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     x = (CANVAS[0] - tile.width) // 2
-    y = CANVAS[1] - tile.height
+    y = CANVAS[1] - tile.height - lift
     canvas.paste(tile, (x, y), tile)
     return canvas
 
@@ -110,6 +119,42 @@ def _nest_tile() -> Image.Image:
     nest = nest.crop((TILE * 3, 0, TILE * 4, TILE))  # 00_3 空巢
     side = int(TILE * SCALE * 1.2)
     return nest.resize((side, side), Image.Resampling.NEAREST)
+
+
+def _house_tile() -> Image.Image:
+    house = Image.open(HOUSE_SHEET).convert("RGBA").crop(HOUSE_BOX)
+    # 預覽方鍵只取畫布下半 64px；再縮到 HOUSE_SCALE
+    max_h = CANVAS[1] // 2
+    max_w = CANVAS[0]
+    fit = min(max_w / house.width, max_h / house.height) * HOUSE_SCALE
+    w = max(1, round(house.width * fit))
+    h = max(1, round(house.height * fit))
+    return house.resize((w, h), Image.Resampling.NEAREST)
+
+
+def _stump_xy(stump: Image.Image) -> tuple[int, int]:
+    x = (CANVAS[0] - stump.width) // 2
+    y = CANVAS[1] - stump.height - HOUSE_LIFT
+    return x, y
+
+
+def _egg_tile(sheet: Image.Image, col: int) -> Image.Image:
+    box = (col * TILE, EGG_ROW * TILE, (col + 1) * TILE, (EGG_ROW + 1) * TILE)
+    return sheet.crop(box).resize((TILE * SCALE, TILE * SCALE), Image.Resampling.NEAREST)
+
+
+def _house_with_egg(egg: Image.Image | None = None) -> Image.Image:
+    canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
+    stump = _house_tile()
+    sx, sy = _stump_xy(stump)
+    canvas.paste(stump, (sx, sy), stump)
+    if egg is None:
+        return canvas
+    # 蛋本體大約在 16 格 y=13；2 倍後底在 26，再往下坐 EGG_SIT
+    ex = (CANVAS[0] - egg.width) // 2
+    ey = sy - 13 * SCALE + EGG_SIT
+    canvas.paste(egg, (ex, ey), egg)
+    return canvas
 
 
 def _in_nest(tile: Image.Image) -> Image.Image:
@@ -280,6 +325,21 @@ def slice_sheet(sheet_path: Path = SHEET, out_dir: Path = FRAMES) -> list[Path]:
         desk_path = out_dir / "desk_empty.png"
         _empty_desk().save(desk_path)
         written.append(desk_path)
+
+    if HOUSE_SHEET.exists():
+        if EGG_SHEET.exists():
+            eggs = Image.open(EGG_SHEET).convert("RGBA")
+            for i in range(EGG_COLS):
+                path = out_dir / f"house_{i:02d}.png"
+                _house_with_egg(_egg_tile(eggs, i)).save(path)
+                written.append(path)
+            icon = out_dir / "house_icon.png"
+            _house_with_egg(_egg_tile(eggs, 0)).save(icon)
+            written.append(icon)
+        else:
+            house_path = out_dir / "house_icon.png"
+            _house_with_egg().save(house_path)
+            written.append(house_path)
 
     return written
 
