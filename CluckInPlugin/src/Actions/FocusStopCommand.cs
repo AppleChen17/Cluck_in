@@ -9,10 +9,13 @@ public class FocusStopCommand : PluginDynamicCommand{
             description: "Stop the current focus timer",
             groupName: "CluckIn")
     {
-        MainController.FocusTimerChanged += this.OnStateChanged;
+        MainController.FocusTimerChanged +=
+            this.OnStateChanged;
     }
 
-    protected override void RunCommand(String actionParameter){
+    protected override void RunCommand(
+        String actionParameter)
+    {
         MainController.HandleKeyEvent(6);
     }
 
@@ -20,11 +23,16 @@ public class FocusStopCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
-        return MainController.CurrentFocusTimerState switch{
-            FocusTimerControlState.Running => "STOP",
-            FocusTimerControlState.Paused => "STOP",
-            _ => "END"
-        };
+        return "END";
+    }
+
+    protected override BitmapImage GetCommandImage(
+        String actionParameter,
+        PluginImageSize imageSize)
+    {
+        return ButtonImageRenderer.DrawCoopState(
+            MainController.CurrentFocusTimerState
+        );
     }
 
     private void OnStateChanged(){

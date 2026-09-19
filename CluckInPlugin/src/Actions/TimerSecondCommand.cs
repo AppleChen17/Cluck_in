@@ -1,4 +1,4 @@
-﻿namespace Loupedeck.CluckInPlugin;
+namespace Loupedeck.CluckInPlugin;
 
 using System;
 
@@ -6,13 +6,16 @@ public class TimerSecondCommand : PluginDynamicCommand{
     public TimerSecondCommand()
         : base(
             displayName: "Timer Second",
-            description: "Select and display focus timer seconds",
+            description: "Select and display focus timer sec",
             groupName: "CluckIn")
     {
-        MainController.FocusTimerChanged += this.OnStateChanged;
+        MainController.FocusTimerChanged +=
+            this.OnStateChanged;
     }
 
-    protected override void RunCommand(String actionParameter){
+    protected override void RunCommand(
+        String actionParameter)
+    {
         MainController.HandleKeyEvent(9);
     }
 
