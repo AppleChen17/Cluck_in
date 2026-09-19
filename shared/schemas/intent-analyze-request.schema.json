@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/intent-analyze-request.schema.json",
+  "title": "IntentAnalyzeRequest",
+  "description": "A single normalized message and working-context snapshot sent to AI to decide what the sender wants, as distinct from whether to interrupt. Carries the current instant because a language model cannot know it and will otherwise invent one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "message",
+    "context",
+    "now"
+  ],
+  "properties": {
+    "message": {
+      "$ref": "external-message.schema.json"
+    },
+    "context": {
+      "$ref": "session-context.schema.json"
+    },
+    "now": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The instant the request is made, with an explicit offset. REQUIRED, and the one field callers forget. A model has no clock: asked to resolve a relative expression such as a weekday or 'the day after tomorrow' without it, it will pick a plausible date and be confidently wrong. The offset also fixes which local day the message refers to."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}

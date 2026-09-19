@@ -1,0 +1,21 @@
+{
+  "message": {
+    "id": "slack:C08ABCDEF:1789788720.000200",
+    "source": "slack",
+    "sender": "Bob Lin",
+    "title": null,
+    "content": "我們約在下週二下午三點開會，談 Cluck In 的進度，大概一小時，會議室 A。",
+    "timestamp": "2026-09-19T11:32:00+08:00",
+    "unread": true,
+    "metadata": {
+      "slackChannel": "C08ABCDEF"
+    }
+  },
+  "context": {
+    "mode": "focus",
+    "currentTask": "Hackathon Proposal",
+    "focusStartedAt": "2026-09-19T11:30:00+08:00",
+    "focusDurationSeconds": 1500
+  },
+  "now": "2026-09-19T11:33:00+08:00"
+}

@@ -13,6 +13,7 @@ import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from reply_registry import ReplyRegistry, ReplyTarget
 from schemas import AdapterStatus, ExternalMessage
 
 MessageSink = Callable[[ExternalMessage], bool]
@@ -27,6 +28,20 @@ class SourceAdapter(ABC):
         self._last_event_at: str | None = None
         self._last_error: str | None = None
         self._emitted = 0
+        self._replies: ReplyRegistry | None = None
+
+    def bind_reply_registry(self, registry: ReplyRegistry) -> None:
+        """Let this adapter record how to answer what it emits.
+
+        Optional and separate from start(): an adapter that cannot be replied to
+        simply never calls _remember_target, and sending stays independent of
+        which adapters happen to be enabled.
+        """
+        self._replies = registry
+
+    def _remember_target(self, target: ReplyTarget | None) -> None:
+        if target is not None and self._replies is not None:
+            self._replies.remember(target)
 
     @abstractmethod
     def start(self, sink: MessageSink) -> None:

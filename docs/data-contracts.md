@@ -12,6 +12,8 @@ These initial JSON Schema contracts describe transport/domain data, not database
 | [SessionContext](../shared/schemas/session-context.schema.json) | app | ai (inside AIRequest) | A snapshot of the user's mode, task, and optional focus settings. |
 | [AIRequest](../shared/schemas/ai-request.schema.json) | app | ai | One ExternalMessage and one SessionContext, composed with `$ref`. |
 | [AIDecision](../shared/schemas/ai-decision.schema.json) | ai | app | A bounded classification and scores associated with a message ID. |
+| [IntentAnalyzeRequest](../shared/schemas/intent-analyze-request.schema.json) | app | ai | One ExternalMessage, one SessionContext, and the current instant. **Proposed — see "Pending" below.** |
+| [IntentDecision](../shared/schemas/intent-decision.schema.json) | ai | app | What the sender wants, and the meeting time extracted from the message. **Proposed — see "Pending" below.** |
 | [ActionCommand](../shared/schemas/action-command.schema.json) | app | actions | An instruction to execute; it does not report success or update app state itself. |
 | [AppState](../shared/schemas/app-state.schema.json) | app | web / logitech | A UI snapshot with session information, counts, and chicken status. |
 
@@ -73,6 +75,8 @@ ExternalEvent currently supplies app context/display information; AIRequest clas
 | SessionContext | mode, currentTask | focusStartedAt, focusDurationSeconds, allowedApps, blockedApps, metadata |
 | AIRequest | message, context | metadata |
 | AIDecision | messageId, decision, relevance, urgency, reason | metadata |
+| IntentAnalyzeRequest | message, context, now | metadata |
+| IntentDecision | messageId, intent, confidence, reason | startTime, endTime, title, metadata |
 | ActionCommand | type, timestamp, payload | metadata |
 | AppState | mode, currentTask, focusRemainingSeconds, heldMessages, urgentMessages, upcomingEvents, chicken, lastUpdatedAt | focusStartedAt, metadata |
 
@@ -126,9 +130,53 @@ All fixtures are under [shared/fixtures](../shared/fixtures/). AIRequest embeds 
 | ai-request.message.json | ai-request.schema.json |
 | ai-decision.urgent.json | ai-decision.schema.json |
 | action-command.notification.json | action-command.schema.json |
+| intent-analyze-request.message.json | intent-analyze-request.schema.json |
+| intent-decision.meeting.json | intent-decision.schema.json |
+| intent-decision.no-time.json | intent-decision.schema.json |
 | app-state.focus.json | app-state.schema.json |
 
 To validate, load all eight schemas into a Draft 2020-12 validator's local registry, check their schema syntax, then validate each fixture against the matching schema with date-time format checks enabled. No validator dependency is added to application modules.
+
+### Intent classification (proposed, not agreed)
+
+`IntentAnalyzeRequest` / `IntentDecision` answer a question the existing AI
+contracts do not. `AIDecision` returns `urgent` / `allow` / `hold`: whether a
+message is worth interrupting the user for. Automatically answering a message
+needs a different answer: what the sender wants. The two are independent — a
+meeting invitation can be worth holding until focus ends *and* worth putting on
+the calendar immediately.
+
+`intent` has two values. `meeting_invite` means the sender states a specific,
+already-decided time. `other` is everything else — explicitly including a
+message that only asks to find a time, which is a deliberate product decision
+rather than an oversight: answering "when are you free" is not being built, and
+the code that computed free slots has been removed along with it. A third value
+for that case would therefore mean rebuilding the answer, not adding an enum
+entry.
+
+Three details in these schemas are not stylistic, and each cost real debugging:
+
+- **`now` is required on the request.** A model has no clock. Asked to resolve
+  "next Tuesday" without being told today's date, it picks a plausible one.
+- **`startTime` and `endTime` are nullable, and null is a real answer.**
+  `meeting_invite` with a null `startTime` means "this is about a meeting and I
+  could not tell when". Consumers must not substitute a guess. A meeting on the
+  wrong day is worse than a meeting nobody scheduled.
+- **`messageId` is injected by the caller, not generated.** A small model asked
+  to reproduce `slack:C08ABCDEF:1789788720.000200` drops a digit, and
+  AIDecision's rule that the id must match exactly then fails at runtime.
+
+`confidence` exists so the consumer can refuse to act. Writing to a calendar is
+harder to undo than showing a notification, so the same threshold does not
+suit both.
+
+**Status: proposed by the `src/external` work, not yet agreed.** The schemas and
+fixtures are committed and validated so the shape can be reviewed concretely,
+and nothing implements them yet. §11 of `PRODUCT_SPEC_MVP.md` lists three
+pending contract changes; this is a fourth. The related scope point is that
+Slack, Google Calendar and automatic replies are all out of scope in §3 of that
+spec, and `src/external` now implements them — also a team decision, and the
+spec has been left untouched rather than edited by one contributor.
 
 ## Team decisions before implementation
 

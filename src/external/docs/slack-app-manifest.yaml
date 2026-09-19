@@ -4,7 +4,7 @@
 # and inviting the bot into the channel.
 display_information:
   name: Cluck In
-  description: Reads public channel messages so the focus chicken can decide what deserves an interruption.
+  description: Reads public channel messages so the focus chicken can decide what deserves an interruption, and answers the ones it can handle itself.
   background_color: "#2c2d30"
 features:
   bot_user:
@@ -20,6 +20,10 @@ oauth_config:
       # Turn U0123ABCD into a readable display name. Without it the sender
       # falls back to "Slack user U0123ABCD".
       - users:read
+      # Post replies. Required by POST /reply and POST /send/slack.
+      - chat:write
+      # Add an emoji reaction. Required by POST /react.
+      - reactions:write
 settings:
   event_subscriptions:
     bot_events:

@@ -174,6 +174,161 @@ different app configuration.
 
 ---
 
+## Google Calendar (OAuth)
+
+### Why this one cannot use an app password
+
+App passwords are an IMAP and SMTP mechanism. Google Calendar has no IMAP, its
+CalDAV endpoint stopped accepting basic auth years ago, and the read-only secret
+iCal URL cannot create anything. Reading *and writing* a calendar means the
+Calendar API, and the Calendar API means OAuth. There is no shortcut, and it is
+worth knowing that before spending an hour looking for one.
+
+**You can skip this entirely.** `CALENDAR_BACKEND=memory` (the default) keeps
+events in the process, which is enough to develop against and enough to demo the
+whole flow — the API shapes and the tests are identical either way. The only
+thing you lose is events actually appearing in your real Google Calendar.
+
+### 1. In the Google Cloud console — about ten minutes, once
+
+At <https://console.cloud.google.com>:
+
+1. Create a project. Any name.
+2. **APIs & Services → Library** → search "Google Calendar API" → **Enable**.
+3. **APIs & Services → OAuth consent screen**:
+   - User Type: **External**
+   - Fill in app name, support email, developer email
+   - **Add yourself under "Test users"**
+   - **Leave it in "Testing".** Do not submit for verification. Review takes
+     weeks and buys nothing here; `PRODUCT_SPEC_MVP.md` §12 says the same about
+     the Gmail side.
+4. **Credentials → Create credentials → OAuth client ID → Desktop app**.
+   Download the JSON and save it as `src/external/credentials.json`.
+
+`credentials.json` and `token.json` are both already gitignored.
+
+### 2. Authorize this machine
+
+```powershell
+cd C:\Users\user\Desktop\Cluck_in
+.\.venv\Scripts\python.exe src\external\scripts\setup_google_oauth.py
+```
+
+A browser opens. Sign in as the account whose calendar this is. It will warn
+**"Google hasn't verified this app"** — that is exactly what "Testing" means.
+**Advanced → Continue.**
+
+The script writes `src/external/token.json` and then makes one real call to
+prove the token works, printing your next seven days of events.
+
+### 3. Fill in `.env`
+
+```ini
+CALENDAR_BACKEND=google
+CALENDAR_ID=primary
+CALENDAR_WORKDAY_START=09:00
+CALENDAR_WORKDAY_END=18:00
+# true lets Google email the attendees when an event is created.
+CALENDAR_SEND_INVITES=false
+```
+
+### The seven-day expiry
+
+**While the consent screen stays in "Testing", Google expires refresh tokens
+after seven days.** One morning every calendar call starts failing with
+`invalid_grant`. Nothing is broken — run `setup_google_oauth.py` again. The
+error message from this module says so, because the raw Google one does not.
+
+For a hackathon that trade is strictly better than the verification queue. It is
+worth re-running the script the morning of a demo regardless.
+
+### What the backend does and does not do
+
+- **All-day events are skipped.** They have no time and no offset, the
+  `ExternalEvent` contract requires a full date-time, and `docs/data-contracts.md`
+  defers all-day handling. Coercing one to midnight would block the whole day.
+- Two scopes are requested: `calendar.events` (read and write events) and
+  `calendar.readonly`, which nothing uses any more — it was needed by
+  `freebusy.query`, which went with the availability feature. It is kept only
+  so an already-issued `token.json` stays valid; narrowing the list invalidates
+  it and forces everyone to re-authorize. Drop it at the next scope change.
+  Deliberately not the full `calendar` scope, which would also allow deleting
+  calendars. None of them can reach your Gmail, Drive or contacts.
+- **Changing the scope list invalidates an existing `token.json`.** Delete it
+  and re-run the setup script; the error message from this module says so.
+- Revoke it any time at <https://myaccount.google.com/permissions>.
+
+---
+
+## Sending
+
+Outbound needs nothing new for Gmail: the **same app password** works for
+`smtp.gmail.com` as for `imap.gmail.com`. Slack needs **two extra scopes** and a
+reinstall, because scopes are granted at install time.
+
+### 1. Slack: add the scopes and reinstall
+
+At <https://api.slack.com/apps> → your app → **OAuth & Permissions** → Bot Token
+Scopes, add:
+
+| Scope | Needed by |
+|---|---|
+| `chat:write` | `POST /reply`, `POST /send/slack` |
+| `reactions:write` | `POST /react` |
+
+Then **Reinstall to Workspace** at the top of that page. Without the reinstall
+the scopes are listed but not granted, and calls fail with `missing_scope` —
+which does not look like a permissions error at first glance.
+
+An app created from the current `docs/slack-app-manifest.yaml` already has them.
+
+### 2. Decide where it is allowed to speak, then turn it on
+
+```ini
+# Start here. Everything is routed and recorded; nothing leaves the machine.
+EXTERNAL_SEND_DRY_RUN=true
+
+# Before you ever set that to false, fill this in.
+EXTERNAL_SEND_ALLOWLIST=you@gmail.com,C08ABCDEF
+
+GMAIL_FROM_NAME=Cluck In
+SLACK_DEFAULT_CHANNEL=C08ABCDEF
+```
+
+The allowlist is the guard that matters. An AI is choosing the words and a loop
+is choosing the moment; an empty allowlist means both of them can reach anyone
+who has ever emailed you. Put your own address and the demo channel in it, and
+nothing else, until you have watched it behave.
+
+`GET /outbox` shows what was sent, or would have been. Read it after every
+rehearsal.
+
+### 3. Rehearse, then go live
+
+```powershell
+# still EXTERNAL_SEND_DRY_RUN=true
+Invoke-RestMethod http://127.0.0.1:8100/outbox | ConvertTo-Json -Depth 5
+```
+
+When the previews look right, set `EXTERNAL_SEND_DRY_RUN=false` and restart. The
+first real send should be to yourself.
+
+### What the Gmail sender does
+
+- Sends over SMTP with SSL on port 465.
+- A reply carries `In-Reply-To` and `References`, so Gmail threads it instead of
+  showing an unrelated mail whose subject starts with "Re:".
+- Files a copy in your **Sent** folder over IMAP afterwards. SMTP does not do
+  this — the Gmail UI and the Gmail API write that folder, not the SMTP server —
+  so without the copy a reply is genuinely delivered and invisible in your own
+  account, which during a demo is indistinguishable from a failure.
+- Finds that folder by its `\Sent` special-use flag rather than by name, because
+  the name is localized per account language.
+- Filing the copy is best effort and happens **after** the send, so a failure
+  there is never reported as a failure to send.
+
+---
+
 ## Verifying
 
 ```powershell
@@ -199,3 +354,44 @@ Invoke-RestMethod "http://127.0.0.1:8100/messages?limit=10" | ConvertTo-Json -De
 Check that the Gmail `title` is readable text rather than `=?UTF-8?B?...?=`,
 that both timestamps carry an offset like `+08:00`, and that the Slack `sender`
 is a display name rather than `U0123ABCD`.
+
+### Sending and the calendar
+
+`/health` now reports both:
+
+```powershell
+(Invoke-RestMethod http://127.0.0.1:8100/health).sending
+(Invoke-RestMethod http://127.0.0.1:8100/health).calendar
+```
+
+`sending.ready` should list the transports that have credentials, and
+`calendar.backend` should say `google` once the token exists — if it still says
+`memory` after you set `CALENDAR_BACKEND=google`, the token was not found and
+the service logged a warning at startup saying so.
+
+Reply to a message you actually received, taking its id from `/messages`:
+
+```powershell
+$json = '{"messageId":"<paste an id here>","body":"Testing the reply path."}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8100/reply `
+  -ContentType 'application/json; charset=utf-8' `
+  -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
+```
+
+> As with `/debug/inject`: passing a plain string to `-Body` in Windows
+> PowerShell 5.1 encodes it as Latin-1, mangling every Chinese character before
+> it leaves your machine. Always convert to `[byte[]]`.
+
+With the dry run on you get `delivered: false, dryRun: true` and an entry in
+`/outbox`. That is the whole path working — the only step left is the provider
+call.
+
+And the calendar:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8100/calendar/events?withinDays=7" | ConvertTo-Json -Depth 5
+```
+
+The events you see should be the ones on your real calendar, with offsets like
+`+08:00`. If the list is empty and your calendar is not, check `calendar.backend`
+in `/health` — `google` with no token silently falls back to `memory`.
