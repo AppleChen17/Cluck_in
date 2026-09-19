@@ -14,6 +14,7 @@ public sealed class WorkspaceManager : IWorkspaceManager
         {
             Id = "coding",
             Name = "Coding",
+            Description = "Software development and technical work",
             AllowedApplications = ["code", "devenv", "WindowsTerminal"],
             AllowedDomains = ["localhost", "github.com", "stackoverflow.com", "chatgpt.com", "learn.microsoft.com", "developer.mozilla.org"],
             AllowedWindowKeywords = ["GitHub", "Stack Overflow", "Documentation", "ChatGPT"],

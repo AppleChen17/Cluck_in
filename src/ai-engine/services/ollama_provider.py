@@ -1,5 +1,6 @@
 import time
 import requests
+import subprocess
 
 from config import OLLAMA_BASE_URL, OLLAMA_MODEL
 from schemas import (
@@ -111,8 +112,11 @@ class OllamaProvider(LLMProvider):
                 f"{data['eval_duration'] / 1_000_000_000:.2f}s"
             )
 
-        return data["message"]["content"]
+        print("\n[Ollama] process status:")
+        subprocess.run(["ollama", "ps"])
 
+        return data["message"]["content"]
+    
     def analyze_message(
         self,
         request: AIRequest,

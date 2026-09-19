@@ -117,10 +117,15 @@ static class TaskChecks
                         if (malformed.StatusCode != HttpStatusCode.BadRequest || !(await malformed.Content.ReadAsStringAsync()).Contains("error")) throw new Exception("Malformed JSON error missing");
                         var form = await client.PostAsync("/api/tasks/api-test/start", new StringContent(""));
                         if (form.StatusCode != HttpStatusCode.UnsupportedMediaType) throw new Exception("Blind POST accepted");
+                        var ended = await client.PostAsJsonAsync("/api/session/end-task", new { });
+                        ended.EnsureSuccessStatusCode();
+                        var afterEnd = await client.GetFromJsonAsync<SessionResponse>("/api/session");
+                        if (afterEnd?.CurrentTask is not null || afterEnd?.FocusSession.Status != FocusSessionStatus.Stopped)
+                            throw new Exception("End Task API must clear task and stop focus");
                         client.DefaultRequestHeaders.Add("Origin", "https://untrusted.example");
                         var origin = await client.PostAsJsonAsync("/api/tasks/api-test/start", new { });
                         if (origin.StatusCode != HttpStatusCode.Forbidden) throw new Exception("Untrusted origin accepted");
-                        Console.WriteLine("Passed 12 Task/Intervention API integration checks (no real app or URL launched).");
+                        Console.WriteLine("Passed 13 Task/Intervention API integration checks (no real app or URL launched).");
                     }
                     finally { await app.StopAsync(); }
                     completion.SetResult();
@@ -135,6 +140,7 @@ static class TaskChecks
         return completion.Task;
     }
 
+    private sealed record SessionResponse(TaskProfile? CurrentTask, FocusSession FocusSession);
     private sealed record StartResponse(bool Success, string TaskId, string TaskName);
 
     private sealed class FakeDesktop(Action beforeLaunch) : IDesktopManager
