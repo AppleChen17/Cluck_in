@@ -23,8 +23,26 @@ public class TimerHourCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
+        var state =
+            MainController.CurrentFocusTimerState;
+
+        if(state is
+            FocusTimerControlState.Running or
+            FocusTimerControlState.Paused)
+        {
+            var progress = TimerTextProgress.Render(
+                MainController.GetFocusTimerSegmentRemainingRatio(
+                    0
+                )
+            );
+
+            return $"{MainController.DisplayFocusHours:00}" +
+                   $"{Environment.NewLine}{progress}";
+        }
+
         var label =
-            MainController.CurrentFocusTimerField == FocusTimerField.Hours
+            MainController.CurrentFocusTimerField ==
+                FocusTimerField.Hours
                 ? "HR"
                 : "hr";
 

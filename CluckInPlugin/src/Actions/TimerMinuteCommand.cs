@@ -23,8 +23,26 @@ public class TimerMinuteCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
+        var state =
+            MainController.CurrentFocusTimerState;
+
+        if(state is
+            FocusTimerControlState.Running or
+            FocusTimerControlState.Paused)
+        {
+            var progress = TimerTextProgress.Render(
+                MainController.GetFocusTimerSegmentRemainingRatio(
+                    1
+                )
+            );
+
+            return $"{MainController.DisplayFocusMinutes:00}" +
+                   $"{Environment.NewLine}{progress}";
+        }
+
         var label =
-            MainController.CurrentFocusTimerField == FocusTimerField.Minutes
+            MainController.CurrentFocusTimerField ==
+                FocusTimerField.Minutes
                 ? "MIN"
                 : "min";
 

@@ -23,8 +23,26 @@ public class TimerSecondCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
+        var state =
+            MainController.CurrentFocusTimerState;
+
+        if(state is
+            FocusTimerControlState.Running or
+            FocusTimerControlState.Paused)
+        {
+            var progress = TimerTextProgress.Render(
+                MainController.GetFocusTimerSegmentRemainingRatio(
+                    2
+                )
+            );
+
+            return $"{MainController.DisplayFocusSeconds:00}" +
+                   $"{Environment.NewLine}{progress}";
+        }
+
         var label =
-            MainController.CurrentFocusTimerField == FocusTimerField.Seconds
+            MainController.CurrentFocusTimerField ==
+                FocusTimerField.Seconds
                 ? "SEC"
                 : "sec";
 
