@@ -97,6 +97,7 @@ await TaskChecks.RunAsync();
 await InterventionChecks.RunAsync();
 await BrowserUrlChecks.RunAsync();
 await TaskAnalysisChecks.RunAsync();
+await UrgentMessageChecks.RunAsync();
 if (args.Contains("--ui")) await WpfLaunchChecks.RunAsync();
 
 sealed class FakeWindowManager : IWindowManager

@@ -57,6 +57,8 @@
             <Button Content="End Task" Command="{Binding EndTaskCommand}" Margin="0,8,0,0" AutomationProperties.AutomationId="EndTask" />
             <TextBlock Text="Task duration or 25 minutes · Updates every second" Foreground="{StaticResource MutedText}" FontSize="12" HorizontalAlignment="Center" Margin="0,14,0,0" />
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#A74632" TextWrapping="Wrap" Margin="0,8,0,0" />
+            <TextBlock Text="{Binding UrgentMessageStatus}" Foreground="{StaticResource MutedText}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" />
+            <Button Content="測試緊急通知" Command="{Binding PreviewUrgentMessageCommand}" Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>
 </Window>

@@ -10,6 +10,8 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private ChickenInterventionWindow? _chicken;
+    private UrgentMessageWindow? _urgent;
+    private readonly DispatcherTimer _messageTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private bool _closing;
     private bool _shutdownComplete;
 
@@ -19,13 +21,33 @@ public partial class MainWindow : Window
         DataContext = _viewModel = viewModel;
         _viewModel.PropertyChanged += UpdateChicken;
         _refreshTimer.Tick += RefreshTick;
+        _messageTimer.Tick += MessageTick;
         Loaded += OnLoaded;
         Closing += OnClosing;
     }
 
     private void UpdateChicken(object? sender, PropertyChangedEventArgs e)
     {
-        if (_closing || !_viewModel.Intervention.IsActive)
+        if (!_closing && _viewModel.UrgentMessage is not null)
+        {
+            if (_urgent is null)
+            {
+                _urgent = new UrgentMessageWindow { DataContext = _viewModel };
+                _urgent.Closed += (_, _) =>
+                {
+                    _urgent = null;
+                    if (!_closing && _viewModel.UrgentMessage is not null)
+                        _viewModel.AcknowledgeUrgentMessageCommand.Execute(null);
+                };
+                _urgent.Show();
+            }
+        }
+        else
+        {
+            _urgent?.Close();
+            _urgent = null;
+        }
+        if (_closing || _viewModel.UrgentMessage is not null || !_viewModel.Intervention.IsActive)
         {
             _chicken?.Close();
             _chicken = null;
@@ -42,9 +64,15 @@ public partial class MainWindow : Window
     {
         await _viewModel.RefreshAsync();
         if (!_closing) _refreshTimer.Start();
+        if (!_closing)
+        {
+            _messageTimer.Start();
+            await _viewModel.PollUrgentMessagesAsync();
+        }
     }
 
     private async void RefreshTick(object? sender, EventArgs e) => await _viewModel.RefreshAsync();
+    private async void MessageTick(object? sender, EventArgs e) => await _viewModel.PollUrgentMessagesAsync();
 
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -53,6 +81,10 @@ public partial class MainWindow : Window
         if (_closing) return;
         _closing = true;
         _viewModel.PropertyChanged -= UpdateChicken;
+        _urgent?.Close();
+        _urgent = null;
+        _messageTimer.Stop();
+        _messageTimer.Tick -= MessageTick;
         _chicken?.Close();
         _chicken = null;
         _refreshTimer.Stop();

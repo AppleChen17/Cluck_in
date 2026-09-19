@@ -25,6 +25,7 @@ public static class TaskApiHost
         builder.Configuration.AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true)
             .AddEnvironmentVariables();
         builder.Services.Configure<AiEngineOptions>(builder.Configuration.GetSection("AiEngine"));
+        builder.Services.Configure<ExternalMessagesOptions>(builder.Configuration.GetSection("ExternalMessages"));
         DesktopAgentFactory.RegisterServices(builder.Services);
         var app = builder.Build();
 

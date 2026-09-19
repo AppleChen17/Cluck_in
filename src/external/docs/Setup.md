@@ -150,12 +150,31 @@ In `#cluck-in-demo`:
 ### 6. Fill in `.env`
 
 ```ini
-EXTERNAL_ADAPTERS=gmail,slack
-SLACK_ENABLED=true
+EXTERNAL_ADAPTERS=slack
 SLACK_BOT_TOKEN=xoxb-...
 SLACK_APP_TOKEN=xapp-...
 SLACK_CHANNEL_ALLOWLIST=
 SLACK_BACKFILL_MINUTES=10
+```
+
+> **`EXTERNAL_ADAPTERS` is the only switch that selects a source.**
+> `SLACK_ENABLED` is read by nothing — setting it without putting `slack` in
+> `EXTERNAL_ADAPTERS` leaves you on the fixture adapter, looking at Bob and
+> Alice. The service warns about exactly that at startup.
+>
+> Use `gmail,slack` for both. Do not leave `fixture` in the list for a demo: the
+> committed example messages would appear in `GET /messages` next to the real
+> ones.
+
+Both tokens are required. If either is missing — or still the bare `xoxb-` /
+`xapp-` prefix from `.env.example`, or the two are swapped — the service
+**refuses to start** and names the variable. It does not fall back to fixture
+data, because a fallback here is indistinguishable from Slack working.
+
+Confirm it on the first line of the log:
+
+```
+Message source: slack
 ```
 
 `SLACK_CHANNEL_ALLOWLIST` takes channel IDs (`C08ABCDEF`), not names. Leave it

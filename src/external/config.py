@@ -14,6 +14,31 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = REPO_ROOT / "shared" / "fixtures"
 SCHEMAS_DIR = REPO_ROOT / "shared" / "schemas"
 
+# Every value EXTERNAL_ADAPTERS accepts. A name outside this set is a typo, and
+# a typo'd source is rejected rather than skipped: "slck" would otherwise leave
+# the service running with no source at all, answering GET /messages with an
+# empty list forever and no indication why.
+KNOWN_ADAPTERS = ("fixture", "gmail", "slack")
+
+# .env.example ships the Slack tokens as their bare prefixes, so a copied
+# example reads as "configured" while carrying nothing. Treated as unset, which
+# turns an opaque invalid_auth at the first API call into a startup error that
+# names the variable.
+_PLACEHOLDERS = frozenset({"", "xoxb-", "xapp-", "xoxb-...", "xapp-...", "..."})
+
+
+class ConfigError(RuntimeError):
+    """A source was selected explicitly but cannot work as configured.
+
+    Raised at startup, before any adapter is built. Selecting `slack` and
+    getting the committed Bob/Alice fixtures instead -- or an empty inbox with
+    a warning buried in the log -- is the failure this exists to prevent.
+    """
+
+
+def _unset(value: str) -> bool:
+    return value.strip().lower() in _PLACEHOLDERS
+
 
 class Settings(BaseSettings):
     # env_file must be an absolute path. SettingsConfigDict resolves a relative
@@ -122,6 +147,76 @@ class Settings(BaseSettings):
     def slack_channels(self) -> set[str]:
         """Empty set means: every public channel the bot has joined."""
         return {c.strip() for c in self.slack_channel_allowlist.split(",") if c.strip()}
+
+    # -- source selection ------------------------------------------------------
+
+    def missing_slack_settings(self) -> list[str]:
+        """What SLACK_* is missing or still a placeholder, in .env order.
+
+        The token prefixes are checked too. Slack bot tokens are always `xoxb-`
+        and app-level tokens always `xapp-`, so a swapped pair is detectable
+        here; left alone it fails at connect time as `invalid_auth`, which names
+        neither variable.
+        """
+        problems: list[str] = []
+        if _unset(self.slack_bot_token):
+            problems.append("SLACK_BOT_TOKEN is not set")
+        elif not self.slack_bot_token.startswith("xoxb-"):
+            problems.append("SLACK_BOT_TOKEN must be a bot token starting with 'xoxb-'")
+        if _unset(self.slack_app_token):
+            problems.append("SLACK_APP_TOKEN is not set")
+        elif not self.slack_app_token.startswith("xapp-"):
+            problems.append(
+                "SLACK_APP_TOKEN must be an app-level token starting with 'xapp-' "
+                "(Basic Information -> App-Level Tokens, scope connections:write)"
+            )
+        return problems
+
+    def missing_gmail_settings(self) -> list[str]:
+        problems: list[str] = []
+        if _unset(self.gmail_address):
+            problems.append("GMAIL_ADDRESS is not set")
+        if _unset(self.gmail_app_password):
+            problems.append("GMAIL_APP_PASSWORD is not set")
+        return problems
+
+    def validate_sources(self) -> None:
+        """Fail startup when EXTERNAL_ADAPTERS names a source that cannot run.
+
+        Deliberately louder than the calendar, which falls back from `google` to
+        `memory` and reports it in GET /health. A calendar fallback costs you
+        real events; a message-source fallback would serve the committed
+        Bob/Alice fixtures as though they were real Slack traffic, which is
+        indistinguishable from the feature working.
+        """
+        names = self.adapters
+        if not names:
+            raise ConfigError(
+                "EXTERNAL_ADAPTERS is empty. Set it in src/external/.env to one of: "
+                + ", ".join(KNOWN_ADAPTERS)
+            )
+        unknown = [n for n in names if n not in KNOWN_ADAPTERS]
+        if unknown:
+            raise ConfigError(
+                "EXTERNAL_ADAPTERS names {} in src/external/.env, which is not a "
+                "message source. Valid values are: {}.".format(
+                    ", ".join(repr(n) for n in unknown), ", ".join(KNOWN_ADAPTERS)
+                )
+            )
+
+        problems: list[str] = []
+        if "slack" in names:
+            problems += self.missing_slack_settings()
+        if "gmail" in names:
+            problems += self.missing_gmail_settings()
+        if problems:
+            raise ConfigError(
+                "EXTERNAL_ADAPTERS={} but src/external/.env is incomplete:\n  - {}\n"
+                "See src/external/docs/Setup.md. Set EXTERNAL_ADAPTERS=fixture to "
+                "run without credentials.".format(
+                    self.external_adapters.strip(), "\n  - ".join(problems)
+                )
+            )
 
 
 def load_settings() -> Settings:

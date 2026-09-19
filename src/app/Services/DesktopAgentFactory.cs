@@ -47,6 +47,13 @@ public static class DesktopAgentFactory
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }).RemoveAllLoggers();
         services.AddSingleton<ITaskAnalysisClient, TaskAnalysisClient>();
+        services.AddOptions<ExternalMessagesOptions>();
+        services.AddHttpClient("ExternalMessages", (provider, client) =>
+        {
+            client.BaseAddress = new Uri(provider.GetRequiredService<IOptions<ExternalMessagesOptions>>().Value.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(5);
+        }).RemoveAllLoggers();
+        services.AddSingleton<UrgentMessageService>();
         services.AddSingleton<DesktopAgentService>();
         services.AddSingleton<ITaskRepository>(_ =>
         {

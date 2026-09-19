@@ -69,6 +69,13 @@ committed example messages, so it works on a fresh clone with no credentials.
 Every setting lives in `src/external/.env`; see
 [`.env.example`](.env.example) for the full list.
 `EXTERNAL_ADAPTERS` selects sources: a comma list of `gmail`, `slack`, `fixture`.
+It is the only switch that does — `SLACK_ENABLED` and `GMAIL_ENABLED` are read
+by nothing and only earn you a warning. Selecting `slack` or `gmail` without
+their credentials, or naming a source that does not exist, **stops the service
+starting** with an error naming the missing variable; it never quietly serves
+the fixtures instead. Startup logs `Message source: slack` so you can see which
+one you got. Details in [`docs/API.md`](docs/API.md#choosing-the-message-source).
+
 `CALENDAR_BACKEND` selects `memory` (no credentials) or `google`.
 
 Credentials setup is in [`docs/Setup.md`](docs/Setup.md), including why the

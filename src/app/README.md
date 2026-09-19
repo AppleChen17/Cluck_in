@@ -227,3 +227,50 @@ The WPF Current Task label shows which task is retained. End Task (or JSON POST
 task creates a generic session using Workspace rules, then Workspace AI on a whitelist
 miss. AI allow/warn permit the activity; only block enters grace. Session.CurrentTask
 stays null. No meaningful Task or Workspace context means deterministic-only fallback.
+
+## Urgent message WPF alerts
+
+The desktop polls the existing external service (`GET http://127.0.0.1:8100/messages`)
+every five seconds and passes unread messages with the current focus context to the
+existing AI API (`POST http://127.0.0.1:8000/analyze-message`). Only responses with
+`decision: urgent` enter the WPF alert queue. No new classification implementation
+or backend endpoint is introduced. Both services must be running for live alerts.
+The message service URL can be set through `ExternalMessages:BaseUrl`; AI uses the
+existing `AiEngine` settings.
+
+The alert uses the same cream background, gold border, chicken heading and topmost,
+non-activating behavior as the disallowed-website intervention. It shows the sender,
+source, time, title, content and urgency reason. Urgent alerts take visual precedence
+over distraction warnings. Acknowledging advances to the next alert without replying,
+marking the source message read, or stopping focus. The distraction warning can return
+once the urgent queue is empty. Closing the main app closes both kinds of popup.
+
+IDs are deduplicated for the app's lifetime, including after acknowledgement. The
+cursor and queue are in memory, so restarting can replay unread messages. Failed API
+requests are retried without advancing the cursor. Up to 100 urgent alerts can wait;
+when full, polling resumes delivery after the user acknowledges an alert. Allow/hold
+responses do not open this urgent popup. Their deferred delivery is outside this UI.
+
+Smoke checks use fake HTTP responses for urgent/allow/hold, duplicate IDs, cursor
+reuse and failed-analysis retries, and render the WPF alert offscreen to
+`TestResults/wpf/urgent-message.png`. They do not contact Gmail, Slack or Ollama.
+
+For diagnosis, the dashboard reports which service URL failed and its HTTP status
+when available. The 測試緊急通知 button opens a clearly labeled local WPF preview
+without either backend. Previewing does not send any messages.
+
+On this machine the external service uses its own repository-root environment:
+
+```powershell
+.\.venv-external\Scripts\python.exe -m uvicorn app:app --app-dir src/external --host 127.0.0.1 --port 8100 --workers 1
+```
+
+Without `src/external/.env` account configuration this service provides fixture
+messages, not real Gmail/Slack messages. The AI service must also be running on
+port 8000 for real classification.
+
+Automatic alerts now check external `/health` first. If any enabled adapter is
+`fixture`, automatic delivery is disabled and the dashboard explains how to connect
+a real source. Remove `fixture` from `EXTERNAL_ADAPTERS` when using real accounts.
+At least one enabled, connected Gmail/Slack adapter is required. Explicit local
+preview alerts still work without a real account.

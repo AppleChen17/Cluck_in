@@ -414,6 +414,42 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8100/debug/inject `
 
 ---
 
+## Choosing the message source
+
+`EXTERNAL_ADAPTERS` in `src/external/.env` decides where the messages in
+`GET /messages` come from, and it is the only thing that decides:
+
+| | |
+|---|---|
+| `EXTERNAL_ADAPTERS=fixture` | The committed example messages. No credentials. |
+| `EXTERNAL_ADAPTERS=slack` | Real Slack, over Socket Mode. |
+| `EXTERNAL_ADAPTERS=gmail,slack` | Both. |
+
+The selection is checked before any adapter is built, and a bad one is fatal:
+
+- an unrecognized name (`slck`) — it is a typo, not a source to skip;
+- `slack` without `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`, including the bare
+  `xoxb-` / `xapp-` prefixes `.env.example` ships and the two swapped;
+- `gmail` without `GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD`.
+
+The error names the variable and the file. **There is deliberately no fallback
+to fixture**, unlike `CALENDAR_BACKEND=google`, which does fall back to `memory`
+and reports it in `GET /health`. A missing calendar token costs you real events;
+a message-source fallback would serve Bob and Alice as though they were real
+Slack traffic, which reads as the integration working.
+
+Startup logs the source it resolved, and warns when `fixture` is mixed with a
+real one:
+
+```
+2026-09-20 14:02:11 INFO    external: Message source: slack
+```
+
+A source that is configured correctly but cannot *connect* — revoked token, no
+network — is a different case and is not fatal. The service keeps serving,
+`GET /health` reports it as `degraded` with the reason in the adapter's
+`lastError`, and the log carries `No message source is connected`.
+
 ## Developing against this without credentials
 
 Set `EXTERNAL_ADAPTERS=fixture` (the default) and the service serves the

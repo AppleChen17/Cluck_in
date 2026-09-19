@@ -19,9 +19,22 @@ public sealed class DesktopAgentService(
     ITaskAnalysisClient? taskAnalysisClient = null,
     IOptions<AiEngineOptions>? aiOptions = null,
     ILogger<DesktopAgentService>? logger = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    UrgentMessageService? urgentMessages = null)
 {
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
+    public UrgentMessageService? UrgentMessages => urgentMessages;
+    public Task PollUrgentMessagesAsync(CancellationToken cancellationToken)
+    {
+        var session = timerManager.GetCurrentSession();
+        return urgentMessages?.PollAsync(new
+        {
+            mode = session.Status == FocusSessionStatus.Running ? "focus" : "idle",
+            currentTask = CurrentTask?.Description ?? workspaceManager.GetActiveWorkspace()?.Name,
+            focusStartedAt = session.StartTime,
+            focusDurationSeconds = session.Duration.TotalSeconds
+        }, cancellationToken) ?? Task.CompletedTask;
+    }
     private readonly AiEngineOptions _options = aiOptions?.Value ?? new();
     private string? _analysisKey;
     private Task<TaskDecision?>? _analysis;

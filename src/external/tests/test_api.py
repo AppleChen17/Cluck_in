@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 import app as app_module
 from buffer import MessageBuffer
-from config import Settings
+from config import ConfigError, Settings
 
 
 @pytest.fixture
@@ -132,10 +132,18 @@ def test_debug_inject_hidden_when_disabled(monkeypatch):
         }).status_code == 404
 
 
-def test_unknown_adapter_name_does_not_crash_startup(monkeypatch):
+def test_unknown_adapter_name_refuses_to_start(monkeypatch):
+    """Changed behaviour: this used to warn and carry on.
+
+    Carrying on is what makes a typo'd EXTERNAL_ADAPTERS look like a working
+    service with nothing to say -- and with 'fixture' still in the list, like a
+    working service whose only messages are Bob and Alice. See
+    tests/test_source_selection.py.
+    """
     settings = Settings(_env_file=None, external_adapters="fixture,nonsense")
     monkeypatch.setattr(app_module, "settings", settings)
     monkeypatch.setattr(app_module, "buffer", MessageBuffer(maxlen=50))
     monkeypatch.setattr(app_module, "adapters", [])
-    with TestClient(app_module.app) as c:
-        assert c.get("/health").status_code == 200
+    with pytest.raises(ConfigError, match="nonsense"):
+        with TestClient(app_module.app):
+            pass

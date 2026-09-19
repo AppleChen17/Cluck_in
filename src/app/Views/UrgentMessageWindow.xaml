@@ -1,0 +1,29 @@
+<Window x:Class="CluckIn.App.Views.UrgentMessageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cluck In · Urgent message" Width="440" SizeToContent="Height" MaxHeight="650"
+        Topmost="True" ShowActivated="False" ShowInTaskbar="False"
+        WindowStyle="None" ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Background="#FFF7DD" FontFamily="Segoe UI">
+    <Border Background="#FFF7DD" BorderBrush="#D6A64A" BorderThickness="2" Padding="24">
+        <StackPanel>
+            <TextBlock Text="🐔 緊急訊息" FontSize="25" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding UrgentMessage.Message.Source}" Foreground="#657A45" Margin="0,12,0,4" />
+            <TextBlock Text="{Binding UrgentMessage.Message.Sender}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"
+                       MaxHeight="48" TextTrimming="CharacterEllipsis" ToolTip="{Binding UrgentMessage.Message.Sender}" />
+            <TextBlock Text="{Binding UrgentMessage.Message.Timestamp, StringFormat={}{0:MM/dd HH:mm}}" FontSize="12" Foreground="#666666" Margin="0,4,0,8" />
+            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="{Binding UrgentMessage.Message.Title}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <TextBlock Text="{Binding UrgentMessage.Message.Content}" TextWrapping="Wrap" />
+                    <TextBlock Text="需要立即注意的原因" FontWeight="SemiBold" Margin="0,16,0,6" />
+                    <TextBlock Text="{Binding UrgentMessage.Reason}" TextWrapping="Wrap" Foreground="#A74632" />
+                </StackPanel>
+            </ScrollViewer>
+            <TextBlock Text="{Binding UrgentMessageCount, StringFormat=待確認訊息：{0}}" FontSize="12" Margin="0,16,0,6" />
+            <Button Content="已讀，繼續專注" Command="{Binding AcknowledgeUrgentMessageCommand}" Padding="12,8"
+                    AutomationProperties.AutomationId="AcknowledgeUrgentMessage" />
+            <TextBlock Text="僅關閉這則提醒，不會回覆訊息或停止專注。" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0" />
+        </StackPanel>
+    </Border>
+</Window>

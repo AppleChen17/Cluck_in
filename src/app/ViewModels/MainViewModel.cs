@@ -16,10 +16,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _closing;
     private string? _errorMessage;
     private string? _interventionError;
+    private readonly CancellationTokenSource _messageCancellation = new();
 
     public MainViewModel(DesktopAgentService agent)
     {
         _agent = agent;
+        PreviewUrgentMessageCommand = new(_ =>
+        {
+            _agent.UrgentMessages?.Enqueue(new(new ExternalMessage
+            {
+                Id = "preview:" + Guid.NewGuid(), Source = "slack", Sender = "Cluck In 測試",
+                Title = "WPF 通知預覽（非真實訊息）", Content = "看到這個視窗，表示 WPF 緊急通知可以正常顯示。",
+                Timestamp = DateTimeOffset.Now
+            }, "這是本機視窗測試，不需要訊息或 AI 服務。"));
+            OnPropertyChanged(string.Empty);
+            return Task.CompletedTask;
+        }, _ => !_closing && _agent.UrgentMessages is { Count: < 100 });
+        AcknowledgeUrgentMessageCommand = new(_ =>
+        {
+            if (UrgentMessage is { } alert) _agent.UrgentMessages?.Acknowledge(alert.Message.Id);
+            OnPropertyChanged(string.Empty);
+            return Task.CompletedTask;
+        });
         Workspaces = agent.GetWorkspaces();
         _selectedWorkspace = agent.GetActiveWorkspace() ?? Workspaces.FirstOrDefault();
         if (agent.GetActiveWorkspace() is null && _selectedWorkspace is not null)
@@ -43,6 +61,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public UrgentMessage? UrgentMessage => _agent.UrgentMessages?.Current;
+    public int UrgentMessageCount => _agent.UrgentMessages?.Count ?? 0;
+    public string UrgentMessageStatus => _agent.UrgentMessages?.Status ?? "";
+    public RelayCommand AcknowledgeUrgentMessageCommand { get; }
+    public RelayCommand PreviewUrgentMessageCommand { get; }
+    public async Task PollUrgentMessagesAsync()
+    {
+        if (_closing) return;
+        await _agent.PollUrgentMessagesAsync(_messageCancellation.Token);
+        if (!_closing) OnPropertyChanged(string.Empty);
+    }
     public IReadOnlyList<WorkspaceProfile> Workspaces { get; }
     public WorkspaceProfile? SelectedWorkspace
     {
@@ -155,6 +184,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public async Task ShutdownAsync()
     {
         _closing = true;
+        _messageCancellation.Cancel();
         NotifyCommands();
         await _serviceGate.WaitAsync();
         try { _agent.StopFocus(); }

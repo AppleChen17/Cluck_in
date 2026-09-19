@@ -28,7 +28,7 @@ from fastapi import FastAPI, HTTPException, Query
 
 import normalize
 from buffer import MessageBuffer, encode_cursor, parse_cursor
-from config import Settings, load_settings
+from config import ConfigError, Settings, load_settings
 from gcal.base import CalendarBackend, CalendarError
 from idempotency import OnceByKey
 from reply_registry import ReplyRegistry, target_from_message
@@ -52,6 +52,15 @@ from sender.gmail_sender import GmailSender, build_references, build_reply_subje
 from sender.outbox import Outbox
 from sender.slack_sender import SlackSender
 
+# uvicorn configures only its own "uvicorn.*" loggers, and they do not
+# propagate. Without this the root logger has no handler, logging falls back to
+# lastResort at WARNING, and every log.info below -- "Message source: slack"
+# included -- is silently discarded. basicConfig only installs a handler when
+# the root has none, so it never duplicates uvicorn's own output.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+)
 log = logging.getLogger("external")
 
 settings: Settings = load_settings()
@@ -68,6 +77,11 @@ calendar: CalendarBackend | None = None
 
 
 def _build_adapters(cfg: Settings) -> list:
+    """Instantiate the sources EXTERNAL_ADAPTERS names.
+
+    Call validate_sources() first: this assumes every name is known and every
+    selected source has its credentials.
+    """
     from adapters.fixture_adapter import FixtureAdapter
 
     built = []
@@ -82,9 +96,44 @@ def _build_adapters(cfg: Settings) -> list:
             from adapters.slack_adapter import SlackAdapter
 
             built.append(SlackAdapter(cfg))
-        else:
-            log.warning("unknown adapter %r in EXTERNAL_ADAPTERS, ignoring", name)
+        else:  # pragma: no cover - validate_sources rejects these first
+            raise ConfigError("unknown message source {!r} in EXTERNAL_ADAPTERS".format(name))
     return built
+
+
+def _announce_source(cfg: Settings) -> None:
+    """One unmissable line saying where messages are about to come from.
+
+    "Message source: fixture" when a demo shows Bob and Alice is the difference
+    between a five second fix and half an hour spent looking for the Slack bug
+    that is not there.
+    """
+    names = cfg.adapters
+    log.info("Message source: %s", ", ".join(names))
+    if "fixture" in names and len(names) > 1:
+        # Not an error -- seeding a live dashboard with the example messages is
+        # a legitimate rehearsal trick -- but it must never be a surprise.
+        real = [n for n in names if n != "fixture"]
+        log.warning(
+            "EXTERNAL_ADAPTERS mixes 'fixture' with %s: the committed Bob/Alice "
+            "example messages will appear in GET /messages alongside real ones. "
+            "Drop 'fixture' for a clean run.",
+            ", ".join(real),
+        )
+    for source in ("slack", "gmail"):
+        if getattr(cfg, "{}_enabled".format(source)) and source not in names:
+            # These two flags are documented but read by nothing. Setting
+            # SLACK_ENABLED=true and expecting Slack messages is the easiest
+            # possible mistake to make, and it fails as fixture data.
+            log.warning(
+                "%s_ENABLED=true but EXTERNAL_ADAPTERS=%s does not include '%s'. "
+                "EXTERNAL_ADAPTERS is the only switch that selects sources; "
+                "%s_ENABLED is ignored.",
+                source.upper(),
+                cfg.external_adapters.strip(),
+                source,
+                source.upper(),
+            )
 
 
 def _build_calendar(cfg: Settings) -> CalendarBackend:
@@ -114,6 +163,17 @@ def _build_calendar(cfg: Settings) -> CalendarBackend:
 async def lifespan(_: FastAPI):
     global dispatcher, calendar
 
+    # Before anything else, and fatal on purpose. A service that starts on a
+    # broken EXTERNAL_ADAPTERS goes on answering GET /messages with 200 and
+    # either nothing or the fixtures, and every consumer downstream reads that
+    # as "no messages arrived" rather than "this was never configured".
+    try:
+        settings.validate_sources()
+    except ConfigError as exc:
+        log.error("Message source configuration error:\n%s", exc)
+        raise
+    _announce_source(settings)
+
     dispatcher = Dispatcher(
         settings,
         outbox,
@@ -132,6 +192,18 @@ async def lifespan(_: FastAPI):
         except Exception as exc:  # noqa: BLE001
             adapter._mark_error(f"{type(exc).__name__}: {exc}")
             log.exception("adapter %s failed to start", adapter.name)
+
+    # Config is already known good by here, so anything that failed failed for a
+    # live reason -- a revoked token, no network, Slack down. The service keeps
+    # serving (GET /health reports it as degraded with the error), but losing
+    # every real source must not be a single line in the middle of the log.
+    live = [a for a in adapters if a.name != "fixture"]
+    if live and all(a.health().lastError for a in live):
+        log.error(
+            "No message source is connected: %s. GET /messages will stay empty "
+            "until this is fixed; GET /health carries the error.",
+            "; ".join("{}: {}".format(a.name, a.health().lastError) for a in live),
+        )
     yield
     for adapter in adapters:
         try:
