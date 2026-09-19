@@ -332,8 +332,10 @@ public static class MainController{
                 CluckInAction.ViewMessages
             );
 
-            PluginLog.Info(
-                "SHOW_MESSAGES integration pending shared contract"
+            SendInputEvent(
+                "SHOW_MESSAGES",
+                new Dictionary<String, Object>(),
+                2
             );
 
             return;

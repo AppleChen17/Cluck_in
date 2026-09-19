@@ -157,7 +157,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _closing = true;
         NotifyCommands();
         await _serviceGate.WaitAsync();
-        try { _agent.StopFocus(); }
+        try { await _agent.ShutdownAsync(); }
         finally { _serviceGate.Release(); }
     }
 

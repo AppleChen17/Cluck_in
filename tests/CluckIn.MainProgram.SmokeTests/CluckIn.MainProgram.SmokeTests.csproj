@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>14.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\app\Models\MainProgramContracts.cs" Link="Models\MainProgramContracts.cs" />
+    <Compile Include="..\..\src\app\Interfaces\IMainProgramOrchestration.cs" Link="Interfaces\IMainProgramOrchestration.cs" />
+    <Compile Include="..\..\src\app\Orchestration\InMemoryFocusMessageStore.cs" Link="Orchestration\InMemoryFocusMessageStore.cs" />
+    <Compile Include="..\..\src\app\Orchestration\MainProgramCoordinator.cs" Link="Orchestration\MainProgramCoordinator.cs" />
+    <Compile Include="../../src/app/Orchestration/MainProgramHttpAdapters.cs" Link="Orchestration/MainProgramHttpAdapters.cs" />
+  </ItemGroup>
+</Project>

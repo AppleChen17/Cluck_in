@@ -32,6 +32,7 @@ public partial class App : Application
     {
         if (_api is not null)
         {
+            _api.Services.GetRequiredService<DesktopAgentService>().ShutdownAsync().GetAwaiter().GetResult();
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(3));
             _api.StopAsync(cancellation.Token).GetAwaiter().GetResult();
             _api.DisposeAsync().AsTask().GetAwaiter().GetResult();

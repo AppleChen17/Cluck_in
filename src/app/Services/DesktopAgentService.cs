@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CluckIn.App.Orchestration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using CluckIn.App.Interfaces;
@@ -19,8 +20,63 @@ public sealed class DesktopAgentService(
     ITaskAnalysisClient? taskAnalysisClient = null,
     IOptions<AiEngineOptions>? aiOptions = null,
     ILogger<DesktopAgentService>? logger = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    MainProgramCoordinator? mainProgram = null)
 {
+    public MainProgramCoordinator? MainProgram => mainProgram;
+
+    public async Task ChangeModeAsync(string mode, CancellationToken cancellationToken = default)
+    {
+        if (mainProgram is null) throw new InvalidOperationException("Main Program is unavailable.");
+        switch (mode)
+        {
+            case "focus": await mainProgram.EnterFocusAsync(cancellationToken); break;
+            case "idle":
+                StopFocus();
+                await mainProgram.LeaveFocusAsync(cancellationToken);
+                break;
+            default: throw new ArgumentException("Mode must be focus or idle.");
+        }
+    }
+
+    public void SetAIAssistMode(string mode) =>
+        (mainProgram ?? throw new InvalidOperationException("Main Program is unavailable.")).SetAIAssistMode(mode);
+
+    public Task HandlePatAsync(CancellationToken cancellationToken = default) =>
+        (mainProgram ?? throw new InvalidOperationException("Main Program is unavailable.")).HandlePatAsync(cancellationToken);
+
+    public async Task ShutdownAsync()
+    {
+        StopFocus();
+        if (mainProgram is not null) await mainProgram.ShutdownAsync().ConfigureAwait(false);
+    }
+
+    public async Task HandleInputEventAsync(MainInputEvent input, CancellationToken cancellationToken = default)
+    {
+        if (input.Source != "logitech") throw new ArgumentException("Unsupported input source.");
+        switch (input.Type)
+        {
+            case "CHANGE_MODE":
+                await ChangeModeAsync(input.Payload.GetProperty("mode").GetString()!, cancellationToken);
+                break;
+            case "SET_AI_ASSIST_MODE":
+                SetAIAssistMode(input.Payload.GetProperty("mode").GetString()!);
+                break;
+            case "START_FOCUS":
+                var seconds = input.Payload.GetProperty("focusDurationSeconds").GetInt32();
+                if (seconds is < 1 or > 86399) throw new ArgumentException("Invalid focus duration.");
+                StartFocus(TimeSpan.FromSeconds(seconds));
+                break;
+            case "PAUSE_FOCUS": PauseFocus(); break;
+            case "RESUME_FOCUS": ResumeFocus(); break;
+            case "STOP_FOCUS": StopFocus(); break;
+            case "SHOW_MESSAGES":
+                await HandlePatAsync();
+                break;
+            default: throw new ArgumentException($"Unsupported Main Program input: {input.Type}");
+        }
+    }
+
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
     private readonly AiEngineOptions _options = aiOptions?.Value ?? new();
     private string? _analysisKey;
