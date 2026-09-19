@@ -1,10 +1,5 @@
 from services.llm_provider import LLMProvider
-from schemas import (
-    AnalyzeMessageRequest,
-    AnalyzeMessageResponse,
-    DraftReplyRequest,
-    DraftReplyResponse,
-)
+from schemas import AIRequest, AIDecision
 
 
 class MessageService:
@@ -14,12 +9,6 @@ class MessageService:
 
     def analyze_message(
         self,
-        request: AnalyzeMessageRequest
-    ) -> AnalyzeMessageResponse:
+        request: AIRequest
+    ) -> AIDecision:
         return self.provider.analyze_message(request)
-
-    def draft_reply(
-        self,
-        request: DraftReplyRequest
-    ) -> DraftReplyResponse:
-        return self.provider.draft_reply(request)

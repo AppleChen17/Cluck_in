@@ -1,10 +1,6 @@
 from abc import ABC, abstractmethod
-from schemas import (
-    AnalyzeMessageRequest,
-    AnalyzeMessageResponse,
-    DraftReplyRequest,
-    DraftReplyResponse,
-)
+
+from schemas import AIRequest, AIDecision
 
 
 class LLMProvider(ABC):
@@ -12,13 +8,6 @@ class LLMProvider(ABC):
     @abstractmethod
     def analyze_message(
         self,
-        request: AnalyzeMessageRequest
-    ) -> AnalyzeMessageResponse:
-        pass
-
-    @abstractmethod
-    def draft_reply(
-        self,
-        request: DraftReplyRequest
-    ) -> DraftReplyResponse:
+        request: AIRequest
+    ) -> AIDecision:
         pass

@@ -1,9 +1,4 @@
-from schemas import (
-    AnalyzeMessageRequest,
-    AnalyzeMessageResponse,
-    DraftReplyRequest,
-    DraftReplyResponse,
-)
+from schemas import AIRequest, AIDecision
 from services.llm_provider import LLMProvider
 
 
@@ -11,22 +6,13 @@ class MockProvider(LLMProvider):
 
     def analyze_message(
         self,
-        request: AnalyzeMessageRequest
-    ) -> AnalyzeMessageResponse:
+        request: AIRequest
+    ) -> AIDecision:
 
-        return AnalyzeMessageResponse(
-            priority="high",
-            relevant=True,
-            should_interrupt=True,
-            summary=f"Mock summary: {request.content[:30]}",
-            suggested_action="notify",
-        )
-
-    def draft_reply(
-        self,
-        request: DraftReplyRequest
-    ) -> DraftReplyResponse:
-
-        return DraftReplyResponse(
-            reply="這是一則 mock reply。"
+        return AIDecision(
+            messageId=request.message.id,
+            decision="urgent",
+            relevance=0.9,
+            urgency=0.8,
+            reason="Mock AI decision",
         )
