@@ -1,0 +1,19 @@
+<Application x:Class="CluckIn.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <SolidColorBrush x:Key="MutedText" Color="#647067" />
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#203229" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Background" Value="#EDF2EB" />
+            <Setter Property="Foreground" Value="#203229" />
+            <Setter Property="BorderBrush" Value="#CFD9CE" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </Application.Resources>
+</Application>

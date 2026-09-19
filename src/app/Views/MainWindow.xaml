@@ -1,0 +1,55 @@
+<Window x:Class="CluckIn.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cluck In" Width="510" Height="770" MinWidth="450" MinHeight="580"
+        WindowStartupLocation="CenterScreen" Background="#F6F7F2"
+        FontFamily="Segoe UI" FontSize="14">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="30,24">
+            <TextBlock Text="CLUCK IN" FontSize="12" FontWeight="Bold" Foreground="#657A45" />
+            <TextBlock Text="A little focus goes a long way." FontSize="24" FontWeight="SemiBold" Margin="0,6,0,22" TextWrapping="Wrap" />
+            <Grid Margin="0,0,0,20">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Workspace" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name"
+                          SelectedItem="{Binding SelectedWorkspace, Mode=TwoWay}" IsEnabled="{Binding CanInteract}"
+                          Padding="10,8" AutomationProperties.AutomationId="WorkspaceSelector" AutomationProperties.Name="Workspace" />
+            </Grid>
+            <Border Background="White" BorderBrush="#DFE5DB" BorderThickness="1" CornerRadius="12" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="10" Height="10" Margin="0,0,10,0">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#819087"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding FocusStatus}" Value="Focused"><Setter Property="Fill" Value="#438653"/></DataTrigger>
+                                        <DataTrigger Binding="{Binding FocusStatus}" Value="Distracted"><Setter Property="Fill" Value="#C16C37"/></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding FocusStatus}" FontSize="22" FontWeight="SemiBold" AutomationProperties.AutomationId="FocusStatus" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding FocusReason}" Foreground="{StaticResource MutedText}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,20" />
+                    <TextBlock Text="Current App" Foreground="{StaticResource MutedText}" FontSize="12" />
+                    <TextBlock Text="{Binding ActiveApplication}" FontWeight="SemiBold" Margin="0,4,0,16" TextWrapping="Wrap" AutomationProperties.AutomationId="ActiveApplication" />
+                    <TextBlock Text="Current Window" Foreground="{StaticResource MutedText}" FontSize="12" />
+                    <TextBlock Text="{Binding ActiveWindowTitle}" Margin="0,4,0,16" TextWrapping="Wrap" MaxHeight="84" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveWindowTitle}" AutomationProperties.AutomationId="ActiveWindowTitle" />
+                    <TextBlock Text="Browser Page" Foreground="{StaticResource MutedText}" FontSize="12" />
+                    <TextBlock Text="{Binding BrowserPageTitle}" Margin="0,4,0,0" TextWrapping="Wrap" MaxHeight="63" TextTrimming="CharacterEllipsis" ToolTip="{Binding BrowserPageTitle}" AutomationProperties.AutomationId="BrowserPageTitle" />
+                </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding TimerText}" FontSize="54" FontWeight="Light" HorizontalAlignment="Center" Margin="0,18,0,0" AutomationProperties.AutomationId="TimerText" />
+            <TextBlock Text="{Binding SessionStatus}" Foreground="{StaticResource MutedText}" HorizontalAlignment="Center" />
+            <UniformGrid Columns="2" Margin="-4,18,-4,0">
+                <Button Content="Start Focus" Command="{Binding StartFocusCommand}" Margin="4" Background="#DCE8C9" AutomationProperties.AutomationId="StartFocus" />
+                <Button Content="Pause" Command="{Binding PauseFocusCommand}" Margin="4" AutomationProperties.AutomationId="PauseFocus" />
+                <Button Content="Resume" Command="{Binding ResumeFocusCommand}" Margin="4" AutomationProperties.AutomationId="ResumeFocus" />
+                <Button Content="Stop" Command="{Binding StopFocusCommand}" Margin="4" AutomationProperties.AutomationId="StopFocus" />
+            </UniformGrid>
+            <TextBlock Text="25-minute sessions · Updates every second" Foreground="{StaticResource MutedText}" FontSize="12" HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="#A74632" TextWrapping="Wrap" Margin="0,8,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>
