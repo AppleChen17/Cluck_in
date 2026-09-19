@@ -236,33 +236,37 @@ question. `/analyze-message` returns `urgent` / `allow` / `hold`, which is about
 whether to interrupt you. Auto-reply needs a different one: *is this person
 telling me a meeting time, or not?*
 
-So one endpoint is missing. Sketched here in the style of that module's
-`schemas.py`, for whoever owns it:
+So one endpoint is missing. **The contract for it is now committed** as
+[`intent-analyze-request.schema.json`](../../shared/schemas/intent-analyze-request.schema.json)
+and [`intent-decision.schema.json`](../../shared/schemas/intent-decision.schema.json),
+with three worked fixtures and 51 checks in
+[`tests/test_shared_contracts.py`](tests/test_shared_contracts.py). It is
+**proposed, not agreed** — see the "Intent classification" section of
+[`docs/data-contracts.md`](../../docs/data-contracts.md). Nothing implements it
+yet; the shape is committed so it can be reviewed concretely rather than
+described.
+
+In that module's own style:
 
 ```python
-class AnalyzeIntentRequest(BaseModel):
+class IntentAnalyzeRequest(BaseModel):
     message: ExternalMessage
     context: SessionContext
     now: datetime                    # required, see below
 
-class AnalyzeIntentResponse(BaseModel):
+class IntentDecision(BaseModel):
+    messageId: str                   # injected by the caller, never generated
     intent: Literal["meeting_invite", "other"]
+    confidence: float                # 0-1; the caller sets its own threshold
     reason: str
-    # meeting_invite only
+    # meeting_invite only; null means "about a meeting, but I cannot tell when"
     startTime: datetime | None = None
-    durationMinutes: int | None = None
+    endTime: datetime | None = None
     title: str | None = None
 ```
 
-Two values, not three. An earlier draft also had `asking_availability` — "they
-are asking when you are free" — which would be answered from
-`POST /calendar/availability`. It was dropped to keep the first cut small. The
-endpoint that answers it still exists and is tested, so adding the third value
-later costs one enum entry and one branch, not a redesign.
-
-**This is a new contract.** `docs/data-contracts.md` says to agree on one before
-implementing against it, and §11 of the spec lists the changes already pending.
-This is not on that list yet.
+`endTime` rather than a duration, so the value passes straight into
+`POST /calendar/events` and `ExternalEvent` without unit arithmetic.
 
 ### Four things that cost time to find
 

@@ -72,16 +72,17 @@ The modules work. The seams between them mostly do not. In rough priority order:
 
 ## Shared contracts
 
-[`docs/data-contracts.md`](docs/data-contracts.md) holds the ownership table and serialization rules. `shared/schemas/` has 11 JSON Schema contracts:
+[`docs/data-contracts.md`](docs/data-contracts.md) holds the ownership table and serialization rules. `shared/schemas/` has 13 JSON Schema contracts:
 
 - Core: `InputEvent`, `ExternalMessage`, `ExternalEvent`, `SessionContext`, `AIRequest`, `AIDecision`, `ActionCommand`, `AppState`
 - Task analysis: `TaskTarget`, `TaskAnalyzeRequest`, `TaskDecision`
+- Intent classification (**proposed, not agreed**): `IntentAnalyzeRequest`, `IntentDecision`
 
-`shared/fixtures/` has a worked example of each except `TaskTarget`, which only ever appears embedded in a `TaskAnalyzeRequest`.
+`shared/fixtures/` has a worked example of each except `TaskTarget`, which only ever appears embedded in a `TaskAnalyzeRequest`. Every schema's syntax and every fixture is checked by `src/external/tests/test_shared_contracts.py`, including that a new fixture cannot arrive unlisted.
 
 Agree on a contract change before implementing against it. Chicken `mood` still lacks `thinking` and `ActionCommand` still lacks `BLOCK_PAGE`; both are listed in §11 of the spec.
 
-A third is now pending and is **not** in that list: `ai-engine` needs an intent-classification pair for auto-reply (`asking_availability` / `meeting_invite` / `other`, plus the extracted meeting time), and its request must carry `now` — a model cannot know what day it is and will invent one. Sketched in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs). §11 needs a fourth entry.
+A fourth is now pending and is **not** in that list: `IntentAnalyzeRequest` / `IntentDecision`, which `ai-engine` needs for auto-reply — `meeting_invite` or `other`, plus the meeting time extracted from the message. The schemas and fixtures are committed and validated so the shape can be reviewed concretely; **nothing implements them yet**. The request must carry `now`, because a model cannot know what day it is and will invent one. Rationale in [`docs/data-contracts.md`](docs/data-contracts.md) under "Intent classification"; the gotchas worth not rediscovering are in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs). §11 of the spec needs a fourth entry.
 
 Related scope note: Slack, Google Calendar and auto-reply are listed **out of scope** in §3 of the spec and as extensions 1–3 in §13. `src/external` implements all three. That was a deliberate step toward the auto mode, but it is a scope change the team has not formally agreed, and the spec has deliberately been left untouched rather than edited unilaterally.
 
