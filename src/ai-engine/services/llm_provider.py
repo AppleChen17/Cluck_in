@@ -5,6 +5,8 @@ from schemas import (
     AIDecision,
     TaskAnalyzeRequest,
     TaskDecision,
+    MessageSummaryRequest,
+    MessageSummaryResponse
 )
 
 
@@ -22,4 +24,11 @@ class LLMProvider(ABC):
         self,
         request: TaskAnalyzeRequest
     ) -> TaskDecision:
+        pass
+
+    @abstractmethod
+    def summarize_messages(
+        self,
+        request: MessageSummaryRequest
+    ) -> MessageSummaryResponse:
         pass
