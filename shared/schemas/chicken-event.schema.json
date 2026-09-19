@@ -13,6 +13,8 @@
         "tick",
         "START_FOCUS",
         "STOP_FOCUS",
+        "PAUSE_FOCUS",
+        "RESUME_FOCUS",
         "PET_CHICKEN",
         "FEED_CHICKEN",
         "SET_MOOD",
@@ -25,7 +27,7 @@
       "properties": {
         "mood": {
           "type": "string",
-          "enum": ["idle", "focused", "thinking", "feed", "pet", "tired"]
+          "enum": ["idle", "focused", "thinking", "feed", "pet", "paused", "tired"]
         },
         "count": { "type": "integer", "minimum": 0 }
       }

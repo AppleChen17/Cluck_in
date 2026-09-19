@@ -59,12 +59,17 @@ class PreviewApp:
         nest_path = FRAMES_DIR / "nest_icon.png"
         nest_src = Image.open(nest_path).convert("RGBA") if nest_path.exists() else None
         self._nest_photo = ImageTk.PhotoImage(_key_image(nest_src))
-        self.keys[NEST_KEY].configure(image=self._nest_photo)
+        self.keys[NEST_KEY].configure(image=self._blank)
+
+        desk_path = FRAMES_DIR / "desk_empty.png"
+        desk_src = Image.open(desk_path).convert("RGBA") if desk_path.exists() else None
+        self._desk_photo = ImageTk.PhotoImage(_key_image(desk_src))
 
         bar = ttk.Frame(root)
         bar.pack(pady=8)
         actions = [
             ("FOCUS", "START_FOCUS"),
+            ("PAUSE", "PAUSE_FOCUS"),
             ("IDLE", "STOP_FOCUS"),
             ("PET", "PET_CHICKEN"),
             ("FEED", "FEED_CHICKEN"),
@@ -95,14 +100,26 @@ class PreviewApp:
         view = self.anim.get_view()
         extra = f"  nest feed={view['feedCount']}"
         self.status.set(f"{view['mood']}  ·  {view['fps']} fps{extra}")
-        self.file_name.set(f"{view['chicken']}  ·  nest={view['nestIcon']} @6")
+        key = int(view.get("displayKey", 5))
+        self.file_name.set(f"{view['chicken']}  ·  nest={view['nestIcon']} @{key}")
         path = FRAMES_DIR / view["chicken"]
         if not path.exists():
             return
         image = Image.open(path).convert("RGBA")
         photo = ImageTk.PhotoImage(_key_image(image))
-        self.photos[CHICKEN_KEY] = photo
-        self.keys[CHICKEN_KEY].configure(image=photo)
+        if key == 6:
+            self.photos[CHICKEN_KEY] = self._desk_photo
+            self.keys[CHICKEN_KEY].configure(image=self._desk_photo)
+            self.photos[NEST_KEY] = photo
+            self.keys[NEST_KEY].configure(image=photo)
+        else:
+            self.photos[CHICKEN_KEY] = photo
+            self.keys[CHICKEN_KEY].configure(image=photo)
+            nest_name = view.get("nestIcon") or ""
+            if nest_name:
+                self.keys[NEST_KEY].configure(image=self._nest_photo)
+            else:
+                self.keys[NEST_KEY].configure(image=self._blank)
 
 
 if __name__ == "__main__":
