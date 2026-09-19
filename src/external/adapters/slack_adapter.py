@@ -60,6 +60,19 @@ def should_ignore(event: dict) -> bool:
     return False
 
 
+def slack_ts_format(epoch: float) -> str:
+    """Render an epoch as a Slack ts: seconds, a dot, then exactly 6 digits.
+
+    str(float) produces a variable number of fractional digits. With 7 or more,
+    Slack reparses the value with the extra digit shifted into the seconds:
+    "1789793604.6410232" is echoed back as "17897936046.410232", a year-2537
+    timestamp that matches nothing. conversations_history then returns an empty
+    window with ok=true, so the backfill silently finds nothing. Verified
+    against the real API.
+    """
+    return "{:.6f}".format(epoch)
+
+
 def slack_ts_to_rfc3339(ts: str, tz_mode: str = "local") -> str:
     moment = datetime.fromtimestamp(float(ts), tz=timezone.utc)
     return normalize.to_rfc3339(moment, tz_mode)
@@ -204,7 +217,7 @@ class SlackAdapter(SourceAdapter):
 
     def _backfill(self) -> None:
         """Replay recent history so a restart does not lose the demo message."""
-        oldest = time.time() - self._cfg.slack_backfill_minutes * 60
+        oldest = slack_ts_format(time.time() - self._cfg.slack_backfill_minutes * 60)
         try:
             channels = self._web.users_conversations(types="public_channel")["channels"]
         except Exception as exc:  # noqa: BLE001
@@ -216,7 +229,7 @@ class SlackAdapter(SourceAdapter):
             if not cid or (allowed and cid not in allowed):
                 continue
             try:
-                history = self._web.conversations_history(channel=cid, oldest=str(oldest))
+                history = self._web.conversations_history(channel=cid, oldest=oldest)
             except Exception as exc:  # noqa: BLE001
                 log.warning("slack backfill failed for %s: %s", cid, exc)
                 continue

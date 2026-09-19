@@ -5,7 +5,13 @@ No workspace, no token, no network.
 
 import pytest
 
-from adapters.slack_adapter import build_message, should_ignore, slack_ts_to_rfc3339
+from adapters.slack_adapter import (
+    SlackAdapter,
+    build_message,
+    should_ignore,
+    slack_ts_format,
+    slack_ts_to_rfc3339,
+)
 
 TS = "1789788720.000200"  # 2026-09-19T11:32:00+08:00, matching the committed fixtures
 
@@ -119,3 +125,64 @@ def test_metadata_survives_serialization(message_validator):
     wire = build_message(event(), sender="Bob").model_dump()
     assert wire["metadata"] == {"slackChannel": "C08ABCDEF"}
     message_validator.validate(wire)
+
+
+# -- backfill window ----------------------------------------------------------
+#
+# Slack's ts is <seconds>.<exactly 6 digits>. Hand it a float repr with 7
+# fractional digits and it shifts the extra one into the seconds, producing a
+# far-future window that matches nothing -- with ok=true and no error at all.
+
+
+def test_the_float_repr_that_broke_the_backfill():
+    """Regression: str() of this exact value was echoed back as 17897936046."""
+    epoch = 1789793604.6410232
+    assert str(epoch) == "1789793604.6410232"  # 7 fractional digits
+    assert slack_ts_format(epoch) == "1789793604.641023"
+
+
+@pytest.mark.parametrize(
+    "epoch",
+    [1789793604.6410232, 1789793604.0, 1789793604.1, 0.0, 1789811399.717649],
+)
+def test_ts_always_has_exactly_six_fractional_digits(epoch):
+    seconds, _, fraction = slack_ts_format(epoch).partition(".")
+    assert seconds.isdigit() and len(fraction) == 6
+
+
+@pytest.mark.parametrize("epoch", [1789793604.6410232, 1789811399.717649])
+def test_ts_round_trips_to_the_same_instant(epoch):
+    assert abs(float(slack_ts_format(epoch)) - epoch) < 1e-6
+
+
+class _FakeWeb:
+    """Records what the backfill actually sends, with no network."""
+
+    def __init__(self):
+        self.history_kwargs = []
+
+    def users_conversations(self, **_):
+        return {"channels": [{"id": "C1"}]}
+
+    def conversations_history(self, **kwargs):
+        self.history_kwargs.append(kwargs)
+        return {"messages": []}
+
+
+def test_backfill_sends_a_well_formed_oldest(monkeypatch):
+    """Guards the wiring, not just the helper: str(oldest) here was the bug."""
+    from config import Settings
+
+    adapter = SlackAdapter(Settings(_env_file=None, slack_backfill_minutes=300))
+    fake = _FakeWeb()
+    adapter._web = fake
+    adapter._sink = lambda _m: True
+    adapter._backfill()
+
+    assert len(fake.history_kwargs) == 1
+    oldest = fake.history_kwargs[0]["oldest"]
+    seconds, _, fraction = oldest.partition(".")
+    assert len(fraction) == 6, f"Slack would misparse {oldest!r}"
+    # 300 minutes back, within a generous tolerance for test runtime
+    import time
+    assert 0 < time.time() - float(oldest) < 300 * 60 + 60
