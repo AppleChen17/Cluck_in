@@ -2,11 +2,11 @@ namespace Loupedeck.CluckInPlugin;
 
 using System;
 
-public class TimerSecondCommand : PluginDynamicCommand{
-    public TimerSecondCommand()
+public class TimerMinuteNativeTestCommand : PluginDynamicCommand{
+    public TimerMinuteNativeTestCommand()
         : base(
-            displayName: "Timer Second",
-            description: "Select and display focus timer sec",
+            displayName: "Timer Minute Native Test",
+            description: "Fresh native-text test for focus timer minutes",
             groupName: "CluckIn")
     {
         MainController.FocusTimerChanged +=
@@ -16,7 +16,7 @@ public class TimerSecondCommand : PluginDynamicCommand{
     protected override void RunCommand(
         String actionParameter)
     {
-        MainController.HandleKeyEvent(9);
+        MainController.HandleKeyEvent(8);
     }
 
     protected override String GetCommandDisplayName(
@@ -25,11 +25,11 @@ public class TimerSecondCommand : PluginDynamicCommand{
     {
         var label =
             MainController.CurrentFocusTimerField ==
-                FocusTimerField.Seconds
-                ? "SEC"
-                : "sec";
+                FocusTimerField.Minutes
+                ? "MIN"
+                : "min";
 
-        return $"{MainController.DisplayFocusSeconds:00}" +
+        return $"{MainController.DisplayFocusMinutes:00}" +
                $"{Environment.NewLine}{label}";
     }
 
