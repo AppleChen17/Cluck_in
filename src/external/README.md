@@ -173,6 +173,7 @@ asking when you are free:
 telling you about a meeting:
   POST /react                    a thumbs up is a real answer
   POST /calendar/events          put it on the calendar
+  POST /reply                    say which time went on it
 ```
 
 **This is not a stand-in for `src/app`.** The real product decides in the C#
@@ -189,7 +190,14 @@ Two things it does on purpose, both worth copying into the C# side:
 - **An extracted meeting time is validated before use.** No offset, unparseable,
   or in the past means no calendar entry and a line saying so. Models reach for
   the current year and last week's weekday; a meeting on the wrong day is worse
-  than no meeting.
+  than no meeting. Verified on real messages: three of four times were extracted
+  correctly, and "下午三點" became 13:00 once, from the same input that gave
+  15:00 on another run. Treat every extracted time as unverified.
+- **It says which time it wrote, and does not offer to correct it.** Showing the
+  inference is what lets a person catch a bad one. Offering to fix it would be a
+  lie today: a reply in that thread is classified as a brand new message with no
+  memory of the first, so "no, make it 4pm" produces a SECOND calendar entry.
+  Thread context and a PATCH endpoint come before that invitation does.
 
 `--no-llm` forces the keyword classifier, which is crude but never fails to
 start. It is there so the demo degrades to something visible instead of dying on

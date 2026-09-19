@@ -48,7 +48,10 @@ sys.path.insert(0, str(MODULE_ROOT))
 # and every message body this prints is Chinese. Never let output kill a run.
 for _stream in (sys.stdout, sys.stderr):
     try:
-        _stream.reconfigure(encoding="utf-8", errors="replace")
+        # line_buffering as well as the encoding: without it Python block-buffers
+        # stdout whenever it is not a terminal, so a loop left running in the
+        # background produces nothing at all until it exits.
+        _stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
     except (AttributeError, ValueError):
         pass
 
@@ -214,6 +217,33 @@ def answer_with_availability(message: dict, args) -> None:
     _report_send(sent)
 
 
+_WEEKDAY_ZH = "一二三四五六日"
+
+
+def describe_event_time(start_iso: str, end_iso: str) -> str:
+    """9/24 (Thu) 13:30-14:30, in the offset the service reported.
+
+    Read back from the created event rather than from what we asked for, so the
+    sentence reflects what is actually on the calendar. That catches a timezone
+    mistake of our own, not only a bad extraction by the model.
+    """
+    start = datetime.fromisoformat(start_iso)
+    end = datetime.fromisoformat(end_iso)
+    return "{}/{}（{}）{:%H:%M}-{:%H:%M}".format(
+        start.month, start.day, _WEEKDAY_ZH[start.weekday()], start, end
+    )
+
+
+def say(message: dict, body: str, args) -> None:
+    """Reply in the same thread. One per message -- see POST /reply."""
+    try:
+        _report_send(request_json(
+            args.external_url + "/reply", {"messageId": message["id"], "body": body}
+        ))
+    except RuntimeError as exc:
+        print("  ! could not reply: {}".format(exc))
+
+
 def acknowledge_meeting(message: dict, intent: dict, args) -> None:
     if message["source"] == "slack":
         try:
@@ -229,8 +259,12 @@ def acknowledge_meeting(message: dict, intent: dict, args) -> None:
     start = _parse_start(intent.get("startTime"))
     if start is None:
         # Honest about the limit rather than inventing a time. A meeting on the
-        # wrong day is worse than no meeting.
+        # wrong day is worse than no meeting -- and saying so out loud is the
+        # other half of that: a silent abstention looks exactly like a crash.
         print("  no usable start time in the message; not creating an event")
+        say(message, "我讀不出這則訊息裡"
+                     "明確的時間，沒有幫"
+                     "你加進日曆。", args)
         return
     minutes = int(intent.get("durationMinutes") or 60)
     created = request_json(
@@ -246,7 +280,31 @@ def acknowledge_meeting(message: dict, intent: dict, args) -> None:
         },
     )
     event = created["events"][0]
-    print("  calendar [{}]: {} {}".format(created["backend"], event["startTime"], event["title"]))
+    if created.get("duplicate"):
+        # Printing this as though an event had just been created hid the dedup
+        # working, which is the one thing worth seeing when a cursor replays.
+        # No second confirmation either: nothing changed, so there is nothing
+        # to tell anyone.
+        print("  already on the calendar from this message: {} {}".format(
+            event["startTime"], event["title"]))
+        return
+
+    print("  calendar [{}]: {} {}".format(
+        created["backend"], event["startTime"], event["title"]))
+    # Show the inference, do not just act on it. Whoever wrote the message is
+    # the one person who knows the right answer, and this is the only moment
+    # they can cheaply correct it.
+    when = describe_event_time(event["startTime"], event["endTime"])
+    # States what it did; does NOT invite a correction. A reply in this thread
+    # is classified as a brand new message with no memory of this one, so
+    # "correct me" would produce a SECOND calendar entry rather than a fix.
+    # Promising a capability that does not exist is worse than staying quiet
+    # about it. Wire up thread context and PATCH /calendar/events first, then
+    # the invitation can come back.
+    say(message, "已加入日曆：{} {}。"
+                 "（由 Cluck In 自動建立，"
+                 "需修改請直接編輯日"
+                 "曆）".format(when, event["title"]), args)
 
 
 def _parse_start(value) -> datetime | None:
