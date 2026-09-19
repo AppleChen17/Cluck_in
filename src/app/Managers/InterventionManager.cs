@@ -36,6 +36,21 @@ public sealed class InterventionManager(IDesktopManager desktopManager, TimeProv
         if (!context.FocusModeEnabled || !context.TimerRunning) ClearPrompt();
     }
 
+    private static string TargetKey(DesktopContext context)
+    {
+        var app = context.ActiveWindow.ProcessName.Trim().ToLowerInvariant();
+        if (app.EndsWith(".exe")) app = app[..^4];
+        var domain = Uri.TryCreate(context.Browser?.Url, UriKind.Absolute, out var uri) ? uri.IdnHost.ToLowerInvariant() : null;
+        return $"{app}|{domain}";
+    }
+
+    public bool IsTemporarilyAllowed(DesktopContext context)
+    {
+        SynchronizeSession(context);
+        return _allowances.TryGetValue(TargetKey(context), out var since) &&
+            _clock.GetElapsedTime(since) < TemporaryAllowance;
+    }
+
     public void Observe(DesktopContext context, FocusEvaluation evaluation, bool shouldIntervene)
     {
         SynchronizeSession(context);
@@ -47,6 +62,7 @@ public sealed class InterventionManager(IDesktopManager desktopManager, TimeProv
             return;
         }
         if (_handlingAction) return;
+        if (evaluation.Source == "temporary_allow") { ClearPrompt(); return; }
         if (evaluation.IsEvaluated && evaluation.IsFocused)
         {
             if (context.Browser is null ? context.ActiveWindow.WindowHandle != 0 :
@@ -62,9 +78,7 @@ public sealed class InterventionManager(IDesktopManager desktopManager, TimeProv
             return;
         }
         var domain = Uri.TryCreate(context.Browser?.Url, UriKind.Absolute, out var uri) ? uri.IdnHost.ToLowerInvariant() : null;
-        var app = context.ActiveWindow.ProcessName.Trim().ToLowerInvariant();
-        if (app.EndsWith(".exe")) app = app[..^4];
-        var target = $"{app}|{domain}";
+        var target = TargetKey(context);
         foreach (var expired in _allowances.Where(p => _clock.GetElapsedTime(p.Value) >= TemporaryAllowance).Select(p => p.Key).ToArray())
             _allowances.Remove(expired);
         if (_allowances.ContainsKey(target) ||

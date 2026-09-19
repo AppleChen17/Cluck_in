@@ -16,7 +16,7 @@ static class ViewModelChecks
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
             dispatcher.InvokeAsync(async () =>
             {
-                try { await CheckAsync(); completion.SetResult(); }
+                try { await CheckAsync(); await CheckTaskLifecycleAsync(); completion.SetResult(); }
                 catch (Exception ex) { completion.SetException(ex); }
                 finally { dispatcher.BeginInvokeShutdown(DispatcherPriority.Background); }
             });
@@ -106,6 +106,77 @@ static class ViewModelChecks
         await vm.ShutdownAsync();
         Check(!vm.StartFocusCommand.CanExecute(null), "Commands disabled on shutdown");
         Console.WriteLine($"Passed {count} ViewModel checks.");
+    }
+
+    private static async Task CheckTaskLifecycleAsync()
+    {
+        var count = 0;
+        void Check(bool value, string label) { if (!value) throw new Exception(label); count++; }
+        var session = new SessionManager();
+        var whitelist = new WhitelistManager();
+        var timer = new TimerManager();
+        var workspace = new WorkspaceManager();
+        var ai = new LifecycleAi();
+        var intervention = new InterventionManager(new LifecycleDesktop());
+        var focus = new FocusManager(timer, whitelist, intervention);
+        var windows = new ChangingWindow { Process = "notepad", Title = "Development notes" };
+        var service = new DesktopAgentService(new ContextManager(windows, new BrowserManager(), workspace, timer, session),
+            workspace, focus, timer, session, whitelist, intervention, ai);
+        var repository = new CluckIn.App.Repositories.InMemoryTaskRepository();
+        await repository.SaveTaskAsync(new() { Id = "task_001", Name = "Cluck In Development", Description = "Build WPF",
+            AllowedApps = ["code"], FocusDurationMinutes = 50 });
+        var tasks = new TaskManager(new LifecycleDesktop(), session, whitelist, focus, repository,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TaskManager>.Instance);
+        await tasks.StartTaskAsync("task_001");
+        var vm = new MainViewModel(service);
+        Check(session.CurrentTask?.Id == "task_001", "ViewModel initialization preserves TaskLauncher task");
+        await vm.RefreshAsync();
+        Check(vm.SelectedWorkspace is not null && vm.CurrentTaskName == "Cluck In Development", "Task not in workspace list does not null selection");
+        async Task Execute(RelayCommand command)
+        {
+            Check(command.CanExecute(null), "Lifecycle command enabled");
+            command.Execute(null);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!vm.CanInteract && DateTime.UtcNow < deadline) await Task.Delay(10);
+            Check(vm.CanInteract && vm.ErrorMessage is null, "Lifecycle command completes");
+        }
+        await Execute(vm.StopFocusCommand);
+        Check(session.CurrentTask?.Id == "task_001" && timer.GetCurrentSession().Status == FocusSessionStatus.Stopped, "Stop Focus preserves task");
+        var before = ai.Calls;
+        await Execute(vm.StartFocusCommand);
+        Check(session.CurrentTask?.Id == "task_001" && timer.GetCurrentSession() is { Status: FocusSessionStatus.Running, Duration.TotalMinutes: 50 }, "Workspace Start Focus preserves task and duration");
+        Check(ai.Calls > before && vm.FocusStatus == "Focused", "Workspace Start Focus reaches AI Task Analysis");
+        await Execute(vm.PauseFocusCommand);
+        Check(session.CurrentTask?.Id == "task_001" && timer.GetCurrentSession().Status == FocusSessionStatus.Paused, "Pause preserves task");
+        await Execute(vm.ResumeFocusCommand);
+        Check(session.CurrentTask?.Id == "task_001" && timer.GetCurrentSession().Status == FocusSessionStatus.Running, "Resume preserves task");
+        service.SetActiveWorkspace("coding");
+        Check(session.CurrentTask?.Id == "task_001", "Workspace selection preserves task");
+        service.StartFocus("coding", TimeSpan.FromMinutes(10));
+        Check(session.CurrentTask?.Id == "task_001", "Original workspace service overload preserves task");
+        await Execute(vm.EndTaskCommand);
+        Check(session.CurrentTask is null && timer.GetCurrentSession().Status == FocusSessionStatus.Stopped && !intervention.State.IsActive, "Explicit End Task clears task and stops focus");
+        before = ai.Calls;
+        await Execute(vm.StartFocusCommand);
+        Check(session.CurrentTask is null && timer.GetCurrentSession() is { Status: FocusSessionStatus.Running, Duration.TotalMinutes: 25 } && ai.Calls > before, "No-task generic focus uses workspace AI");
+        await vm.ShutdownAsync();
+        Console.WriteLine($"Passed {count} Task/Focus lifecycle UI-command checks.");
+    }
+
+    private sealed class LifecycleAi : ITaskAnalysisClient
+    {
+        public int Calls;
+        public Task<TaskDecision> AnalyzeAsync(TaskAnalyzeRequest request, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(new TaskDecision { Decision = "allow", Relevance = 1, Reason = "Related development notes" });
+        }
+    }
+    private sealed class LifecycleDesktop : IDesktopManager
+    {
+        public Task<bool> ReturnToWorkAsync(DesktopContext context) => Task.FromResult(true);
+        public Task OpenApplicationAsync(string path) => throw new Exception("No launch expected");
+        public Task OpenUrlAsync(string url) => throw new Exception("No launch expected");
     }
 
     private sealed class ChangingWindow : IWindowManager

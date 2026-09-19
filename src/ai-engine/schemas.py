@@ -22,6 +22,8 @@ class SessionContext(BaseModel):
     mode: Literal["idle", "focus", "auto"]
     currentTask: Optional[str]
 
+    automationMode: Literal["on", "suggestion", "off"] = "off"
+
     focusStartedAt: Optional[datetime] = None
     focusDurationSeconds: int | None = Field(
         default=None,
@@ -59,6 +61,8 @@ class AIDecision(BaseModel):
         le=1,
     )
 
+    requiresReply: bool
+    replyDraft: str | None = None
     reason: str = Field(min_length=1)
 
     metadata: dict | None = None

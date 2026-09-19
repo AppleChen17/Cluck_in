@@ -10,6 +10,8 @@
     "decision",
     "relevance",
     "urgency",
+    "requiresReply",
+    "replyDraft",
     "reason"
   ],
   "properties": {
@@ -38,6 +40,17 @@
       "minimum": 0,
       "maximum": 1,
       "description": "Time sensitivity, from 0 (none) to 1 (highest)."
+    },
+    "requiresReply": {
+      "type": "boolean",
+      "description": "Whether the incoming message requires a reply from the user."
+    },
+    "replyDraft": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Generated reply content when a reply is required and automationMode is on or suggestion. Null when no reply should be generated."
     },
     "reason": {
       "type": "string",

@@ -3,5 +3,6 @@
 public enum FocusTimerControlState{
     Ready,
     Running,
-    Paused
+    Paused,
+    Completed
 }

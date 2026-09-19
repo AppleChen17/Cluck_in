@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using CluckIn.App.Managers;
 using CluckIn.App.Models;
 using CluckIn.App.Interfaces;
@@ -35,6 +36,17 @@ public static class DesktopAgentFactory
         services.AddSingleton<IWhitelistManager, WhitelistManager>();
         services.AddSingleton<IDesktopManager, DesktopManager>();
         services.AddSingleton<ITaskManager, TaskManager>();
+        services.AddOptions<AiEngineOptions>().Validate(o =>
+            Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == "http" || uri.Scheme == "https") && o.TimeoutSeconds > 0 &&
+            o.CacheSeconds > 0 && o.FailureCacheSeconds > 0, "Invalid AiEngine settings.");
+        services.AddHttpClient("TaskAnalysis", (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<AiEngineOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        }).RemoveAllLoggers();
+        services.AddSingleton<ITaskAnalysisClient, TaskAnalysisClient>();
         services.AddSingleton<DesktopAgentService>();
         services.AddSingleton<ITaskRepository>(_ =>
         {

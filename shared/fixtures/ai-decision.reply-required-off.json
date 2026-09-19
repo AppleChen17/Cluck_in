@@ -1,0 +1,9 @@
+{
+  "messageId": "slack:456",
+  "decision": "allow",
+  "relevance": 0.8,
+  "urgency": 0.4,
+  "requiresReply": true,
+  "replyDraft": null,
+  "reason": "對方提出需要回覆的問題，但目前不產生自動回覆內容。"
+}

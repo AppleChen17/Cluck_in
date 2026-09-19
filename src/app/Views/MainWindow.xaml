@@ -8,6 +8,10 @@
         <StackPanel Margin="30,24">
             <TextBlock Text="CLUCK IN" FontSize="12" FontWeight="Bold" Foreground="#657A45" />
             <TextBlock Text="A little focus goes a long way." FontSize="24" FontWeight="SemiBold" Margin="0,6,0,22" TextWrapping="Wrap" />
+            <TextBlock Text="Current Task" Foreground="{StaticResource MutedText}" FontSize="12" />
+            <TextBlock Text="{Binding CurrentTaskName}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,12" />
+            <TextBlock Text="Task rules apply while a task is selected. End Task to use the workspace rules."
+                       TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedText}" Margin="0,0,0,12" />
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Workspace" VerticalAlignment="Center" />
@@ -48,9 +52,10 @@
                 <Button Content="Start Focus" Command="{Binding StartFocusCommand}" Margin="4" Background="#DCE8C9" AutomationProperties.AutomationId="StartFocus" />
                 <Button Content="Pause" Command="{Binding PauseFocusCommand}" Margin="4" AutomationProperties.AutomationId="PauseFocus" />
                 <Button Content="Resume" Command="{Binding ResumeFocusCommand}" Margin="4" AutomationProperties.AutomationId="ResumeFocus" />
-                <Button Content="Stop" Command="{Binding StopFocusCommand}" Margin="4" AutomationProperties.AutomationId="StopFocus" />
+                <Button Content="Stop Focus" Command="{Binding StopFocusCommand}" Margin="4" AutomationProperties.AutomationId="StopFocus" />
             </UniformGrid>
-            <TextBlock Text="25-minute sessions · Updates every second" Foreground="{StaticResource MutedText}" FontSize="12" HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <Button Content="End Task" Command="{Binding EndTaskCommand}" Margin="0,8,0,0" AutomationProperties.AutomationId="EndTask" />
+            <TextBlock Text="Task duration or 25 minutes · Updates every second" Foreground="{StaticResource MutedText}" FontSize="12" HorizontalAlignment="Center" Margin="0,14,0,0" />
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#A74632" TextWrapping="Wrap" Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>

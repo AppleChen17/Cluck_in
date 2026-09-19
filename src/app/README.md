@@ -214,3 +214,16 @@ UI presentation are covered by deterministic fake-window checks.
 
 Run the smoke runner explicitly: it is not a test-framework project. The demo and
 smoke runner are built through their own commands, not added to the main solution.
+
+## Task Analysis integration
+
+Task-started Focus sessions now use the Python Task Analysis API for activity not
+allowed by local rules. See [integration contract and demo steps](../../docs/task-analysis-integration.md).
+Start/Pause/Resume/Stop Focus retain the selected CurrentTask, including when started
+from the WPF Workspace controls. Task rules and AI analysis take precedence over the
+workspace fallback. Start Focus uses the task duration or 25 minutes if unspecified.
+The WPF Current Task label shows which task is retained. End Task (or JSON POST
+`/api/session/end-task`) stops focus and clears the task. Starting with no selected
+task creates a generic session using Workspace rules, then Workspace AI on a whitelist
+miss. AI allow/warn permit the activity; only block enters grace. Session.CurrentTask
+stays null. No meaningful Task or Workspace context means deterministic-only fallback.

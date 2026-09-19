@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chicken-view.schema.json",
+  "title": "ChickenView",
+  "description": "GET /view snapshot for Main / logitech. Push frames/{chicken} to displayKey (5, or 6 when paused).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mood", "chicken", "fps", "loop", "displayKey", "nestIcon", "deskEmpty", "feedCount"],
+  "properties": {
+    "mood": {
+      "type": "string",
+      "enum": ["idle", "focused", "thinking", "feed", "pet", "paused", "tired"]
+    },
+    "chicken": {
+      "type": "string",
+      "description": "PNG filename under src/chicken/frames/. Draw on displayKey.",
+      "pattern": "^[a-z]+_[0-9]{2}\\.png$"
+    },
+    "fps": { "type": "integer", "minimum": 1 },
+    "loop": { "type": "boolean" },
+    "frameDir": { "type": "string" },
+    "displayKey": {
+      "type": "integer",
+      "enum": [5, 6],
+      "description": "LCD key that should show chicken. 5 = chick; 6 = chick in nest (paused)."
+    },
+    "nestIcon": {
+      "type": "string",
+      "description": "Key 6. Empty when idle/feed. nest_icon.png during a focus session. Same as chicken when paused.",
+      "pattern": "^(nest_icon|[a-z]+_[0-9]{2})\\.png$|^$"
+    },
+    "deskEmpty": {
+      "type": "string",
+      "const": "desk_empty.png",
+      "description": "Empty workstation. Draw on key 5 when mood is paused (chick is on key 6)."
+    },
+    "feedCount": { "type": "integer", "minimum": 0 },
+    "chickenUrl": { "type": "string" }
+  }
+}

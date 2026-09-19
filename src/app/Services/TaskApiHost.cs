@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System.Windows.Threading;
 using CluckIn.App.Interfaces;
 using CluckIn.App.Models;
@@ -21,6 +22,9 @@ public static class TaskApiHost
         builder.Logging.AddSimpleConsole();
         builder.Logging.AddDebug();
         builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+        builder.Configuration.AddJsonFile(System.IO.Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true)
+            .AddEnvironmentVariables();
+        builder.Services.Configure<AiEngineOptions>(builder.Configuration.GetSection("AiEngine"));
         DesktopAgentFactory.RegisterServices(builder.Services);
         var app = builder.Build();
 
@@ -86,6 +90,12 @@ public static class TaskApiHost
                 return Results.Ok(new { success = true, taskId = session.CurrentTask!.Id, taskName = session.CurrentTask.Name });
             }));
         });
+        app.MapPost("/api/session/end-task", async (DesktopAgentService agent) =>
+            await dispatcher.InvokeAsync(() =>
+            {
+                agent.EndTask();
+                return Results.Ok(new { success = true });
+            }));
         app.MapGet("/api/session", async (ISessionManager session, ITimerManager timer) =>
             await dispatcher.InvokeAsync(() => Results.Ok(new { currentTask = session.CurrentTask, focusSession = timer.GetCurrentSession() })));
         app.MapGet("/api/intervention", async (DesktopAgentService agent) =>

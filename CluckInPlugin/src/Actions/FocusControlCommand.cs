@@ -5,15 +5,18 @@ using System;
 public class FocusControlCommand : PluginDynamicCommand{
     public FocusControlCommand()
         : base(
-            displayName: "Focus Control",
+            displayName: "Focus Start",
             description: "Start, pause, or resume focus timer",
             groupName: "CluckIn")
     {
         MainController.ModeChanged += this.OnStateChanged;
-        MainController.FocusTimerChanged += this.OnStateChanged;
+        MainController.FocusTimerChanged +=
+            this.OnStateChanged;
     }
 
-    protected override void RunCommand(String actionParameter){
+    protected override void RunCommand(
+        String actionParameter)
+    {
         MainController.HandleKeyEvent(5);
     }
 
@@ -22,15 +25,26 @@ public class FocusControlCommand : PluginDynamicCommand{
         PluginImageSize imageSize)
     {
         if(MainController.CurrentMode != CluckInMode.Focus){
-            return "FOCUS ONLY";
+            return "FOCUS";
         }
 
         return MainController.CurrentFocusTimerState switch{
             FocusTimerControlState.Ready => "START",
             FocusTimerControlState.Running => "PAUSE",
             FocusTimerControlState.Paused => "RESUME",
-            _ => "FOCUS"
+            FocusTimerControlState.Completed => "START",
+            _ => "START"
         };
+    }
+
+    protected override BitmapImage GetCommandImage(
+        String actionParameter,
+        PluginImageSize imageSize)
+    {
+        return ButtonImageRenderer.DrawDeskState(
+            MainController.CurrentFocusTimerState,
+            MainController.FocusProgress
+        );
     }
 
     private void OnStateChanged(){

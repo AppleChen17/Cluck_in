@@ -22,15 +22,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _agent = agent;
         Workspaces = agent.GetWorkspaces();
         _selectedWorkspace = agent.GetActiveWorkspace() ?? Workspaces.FirstOrDefault();
-        if (_selectedWorkspace is not null)
+        if (agent.GetActiveWorkspace() is null && _selectedWorkspace is not null)
             agent.SetActiveWorkspace(_selectedWorkspace.Id);
 
         ReturnToWorkCommand = new(_ => RunInterventionAsync(InterventionAction.ReturnToWork),
             _ => CanInteract && Intervention.IsActive && Intervention.CanReturnToWork);
         TemporaryAllowCommand = new(_ => RunInterventionAsync(InterventionAction.TemporaryAllow),
             _ => CanInteract && Intervention.IsActive);
-        StartFocusCommand = new(_ => RunAsync(() => _agent.StartFocus(SelectedWorkspace!.Id, TimeSpan.FromMinutes(25))),
-            _ => CanInteract && SelectedWorkspace is not null && !IsFocusModeEnabled);
+        StartFocusCommand = new(_ => RunAsync(() => _agent.StartFocus(TimeSpan.FromMinutes(_agent.CurrentTask?.FocusDurationMinutes ?? 25))),
+            _ => CanInteract && (_agent.CurrentTask is not null || SelectedWorkspace is not null) && !IsFocusModeEnabled);
+        EndTaskCommand = new(_ => RunAsync(_agent.EndTask), _ => CanInteract && _agent.CurrentTask is not null);
         PauseFocusCommand = new(_ => RunAsync(_agent.PauseFocus),
             _ => CanInteract && _context.FocusSession.Status == FocusSessionStatus.Running);
         ResumeFocusCommand = new(_ => RunAsync(_agent.ResumeFocus),
@@ -58,6 +59,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public InterventionState Intervention => _agent.Intervention;
     public RelayCommand ReturnToWorkCommand { get; }
     public RelayCommand TemporaryAllowCommand { get; }
+    public string CurrentTaskName => _agent.CurrentTask?.Name ?? "No task · Generic focus";
+    public RelayCommand EndTaskCommand { get; }
     public string WorkspaceName => _context.WorkspaceName ?? _selectedWorkspace?.Name ?? "No workspace";
     public string ActiveApplication => Display(_context.ActiveWindow.ProcessName);
     public string ActiveWindowTitle => Display(_context.ActiveWindow.WindowTitle);
@@ -109,7 +112,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (_closing) return;
             _context = context;
             _evaluation = evaluation;
-            _selectedWorkspace = Workspaces.FirstOrDefault(w => w.Id == _context.WorkspaceId);
+            _selectedWorkspace = _agent.GetActiveWorkspace() ?? Workspaces.FirstOrDefault();
             _errorMessage = null;
             OnPropertyChanged(string.Empty);
         }
@@ -164,6 +167,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ReturnToWorkCommand.NotifyCanExecuteChanged();
         TemporaryAllowCommand.NotifyCanExecuteChanged();
         StartFocusCommand.NotifyCanExecuteChanged();
+        EndTaskCommand.NotifyCanExecuteChanged();
         PauseFocusCommand.NotifyCanExecuteChanged();
         ResumeFocusCommand.NotifyCanExecuteChanged();
         StopFocusCommand.NotifyCanExecuteChanged();

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chicken-event.schema.json",
+  "title": "ChickenEvent",
+  "description": "POST /event body. Main sends this; response is ChickenView.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "tick",
+        "START_FOCUS",
+        "STOP_FOCUS",
+        "PAUSE_FOCUS",
+        "RESUME_FOCUS",
+        "PET_CHICKEN",
+        "FEED_CHICKEN",
+        "SET_MOOD",
+        "SET_FEED"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mood": {
+          "type": "string",
+          "enum": ["idle", "focused", "thinking", "feed", "pet", "paused", "tired"]
+        },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

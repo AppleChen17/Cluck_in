@@ -1,5 +1,6 @@
 import time
 import requests
+import subprocess
 
 from config import OLLAMA_BASE_URL, OLLAMA_MODEL
 from schemas import (
@@ -13,32 +14,53 @@ from services.llm_provider import LLMProvider
 
 class OllamaProvider(LLMProvider):
 
-    SYSTEM_PROMPT = """
-    你是工作訊息分類器，只能輸出合法 JSON。
+    MESSAGE_SYSTEM_PROMPT = """
+    你是工作訊息分類器，只輸出合法 JSON。
+
+    判斷順序：
+    1. requiresReply
+    2. decision
+    3. relevance
+    4. urgency
+    5. replyDraft
+
+    requiresReply:
+    - requiresReply 只表示「寄件者是否明確期待收件者回應」，不是「禮貌上是否可以回覆」
+    - 有直接問題、確認要求、選擇要求、資訊要求、明確要求回覆 → true
+    - 純通知、公告、提醒、狀態更新、時間異動 → false
+    - 「謝謝」、「敬請見諒」、「請知悉」、「供參考」等禮貌用語不代表需要回覆
+    - 即使可以禮貌回覆，只要寄件者沒有要求或期待回應，requiresReply 仍為 false
+    - 即使訊息前半段是通知，只要後半段有直接問題或要求確認，requiresReply 才為 true
 
     decision:
-    - urgent: 延遲處理可能造成明顯問題，或訊息要求立即處理
-    - allow: 可以正常顯示，但不需要立即中斷使用者
-    - hold: 可以延後到專注結束後再處理
+    - urgent: 必須立即注意
+    - allow: 正常顯示
+    - hold: 可延後處理
 
-    規則:
-    - relevance 表示訊息與 currentTask 的相關程度，範圍 0 到 1
-    - 如果 currentTask 為 null，relevance 必須為 0
-    - urgency 表示訊息的時間急迫程度，範圍 0 到 1
-    - 如果 mode 是 idle，原則上 decision 使用 allow
-    - idle 模式下，只有訊息明確要求立即處理時才使用 urgent
-    - hold 主要用於 focus 模式下，且訊息與目前工作無關或不急
-    - reason 必須簡短，並使用臺灣繁體中文
-    - messageId 必須和輸入完全一致
-    - 不要輸出 Markdown
-    - 不要輸出任何 JSON 以外的文字
+    relevance:
+    - 與 currentTask 的相關程度 0~1
+    - currentTask=null → 0
 
-    輸出格式:
+    urgency:
+    - 時效性 0~1
+
+    replyDraft:
+    - requiresReply=false → null
+    - automationMode=off → null
+    - requiresReply=true 且 automationMode=on/suggestion → 產生簡短回覆
+    - 不得捏造未知資訊
+
+    所有 reason 與 replyDraft 使用臺灣繁體中文。
+    messageId 必須與輸入完全一致。
+
+    輸出：
     {
     "messageId": "string",
-    "decision": "urgent | allow | hold",
+    "decision": "urgent|allow|hold",
     "relevance": 0.0,
     "urgency": 0.0,
+    "requiresReply": true,
+    "replyDraft": null,
     "reason": "string"
     }
     """
@@ -82,8 +104,11 @@ class OllamaProvider(LLMProvider):
                 "stream": False,
                 "format": "json",
                 "keep_alive": "10m",
+                "options": {
+                    "temperature": 0
+                },
             },
-            timeout=30,
+            timeout=60,
         )
 
         response.raise_for_status()
@@ -111,8 +136,11 @@ class OllamaProvider(LLMProvider):
                 f"{data['eval_duration'] / 1_000_000_000:.2f}s"
             )
 
-        return data["message"]["content"]
+        print("\n[Ollama] process status:")
+        subprocess.run(["ollama", "ps"])
 
+        return data["message"]["content"]
+    
     def analyze_message(
         self,
         request: AIRequest,
@@ -127,6 +155,7 @@ class OllamaProvider(LLMProvider):
         user_prompt = f"""
         mode: {context.mode}
         currentTask: {current_task}
+        automationMode: {context.automationMode}
 
         messageId: {message.id}
         source: {message.source}
@@ -135,18 +164,91 @@ class OllamaProvider(LLMProvider):
         content: {message.content}
         """
 
+
         result = self._chat([
             {
                 "role": "system",
-                "content": self.SYSTEM_PROMPT,
+                "content": self.MESSAGE_SYSTEM_PROMPT,
             },
+
+            # Positive example
+            {
+                "role": "user",
+                "content": """
+        mode: focus
+        currentTask: Prepare Demo
+        automationMode: suggestion
+
+        messageId: example-reply
+        source: slack
+        sender: teammate
+        title: null
+        content: Demo 改到晚上八點，你可以確認你會到嗎？
+        """
+            },
+            {
+                "role": "assistant",
+                "content": """
+        {
+        "messageId": "example-reply",
+        "decision": "allow",
+        "relevance": 0.9,
+        "urgency": 0.7,
+        "requiresReply": true,
+        "replyDraft": "可以，我會到，謝謝通知！",
+        "reason": "對方要求確認是否出席，因此需要回覆。"
+        }
+        """
+            },
+
+            # Negative example
+            {
+                "role": "user",
+                "content": """
+        mode: idle
+        currentTask: null
+        automationMode: on
+
+        messageId: example-notice
+        source: gmail
+        sender: organizer@example.com
+        title: 設施維修通知
+        content: 淋浴間今天臨時維修，暫停使用，敬請見諒。
+        """
+            },
+            {
+                "role": "assistant",
+                "content": """
+        {
+        "messageId": "example-notice",
+        "decision": "allow",
+        "relevance": 0.0,
+        "urgency": 0.3,
+        "requiresReply": false,
+        "replyDraft": null,
+        "reason": "此訊息為單向維修通知，沒有要求收件者回覆。"
+        }
+        """
+            },
+
+            # Real request
             {
                 "role": "user",
                 "content": user_prompt,
             },
         ])
 
-        return AIDecision.model_validate_json(result)
+        decision = AIDecision.model_validate_json(result)
+
+        # Enforce automation behavior deterministically.
+        if not decision.requiresReply:
+            decision.replyDraft = None
+
+        elif context.automationMode == "off":
+            decision.replyDraft = None
+
+
+        return decision
 
     def analyze_task(
         self,
