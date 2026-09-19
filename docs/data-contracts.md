@@ -146,11 +146,13 @@ needs a different answer: what the sender wants. The two are independent — a
 meeting invitation can be worth holding until focus ends *and* worth putting on
 the calendar immediately.
 
-`intent` has two values in this draft. `meeting_invite` means the sender states
-a specific, already-decided time. `other` is everything else, including a
-message that only asks to find a time; an `asking_availability` value was
-drafted and deliberately left out of the first cut, and adding it later is an
-enum entry rather than a redesign.
+`intent` has two values. `meeting_invite` means the sender states a specific,
+already-decided time. `other` is everything else — explicitly including a
+message that only asks to find a time, which is a deliberate product decision
+rather than an oversight: answering "when are you free" is not being built, and
+the code that computed free slots has been removed along with it. A third value
+for that case would therefore mean rebuilding the answer, not adding an enum
+entry.
 
 Three details in these schemas are not stylistic, and each cost real debugging:
 
