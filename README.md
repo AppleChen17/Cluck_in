@@ -12,7 +12,7 @@ A hackathon monorepo with five independently owned modules. This initial scaffol
 | `src/ai/` | AI decision engine and HTTP API; future Ollama connection | Python / FastAPI |
 | `src/actions/` | Action and automation engine | C# / .NET |
 
-The .NET solution contains a console app and three empty class libraries. No cross-module references or contracts are defined yet.
+The .NET solution contains a console app and three empty class libraries. Initial shared data contracts are defined in [docs/data-contracts.md](docs/data-contracts.md); module implementations are not connected yet.
 
 ## Run locally
 
@@ -39,8 +39,8 @@ On macOS/Linux, use `src/ai/.venv/bin/python` instead. Open <http://127.0.0.1:80
 
 ## Shared work
 
-- `shared/schemas/`: future cross-module data contracts.
-- `shared/fixtures/`: future sample data for development and tests.
+- `shared/schemas/`: initial cross-module JSON Schema contracts.
+- `shared/fixtures/`: example JSON data conforming to those contracts.
 - `tests/`: future test projects and integration tests.
 - `docs/`: project notes and developer documentation.
 

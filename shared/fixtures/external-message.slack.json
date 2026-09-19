@@ -1,0 +1,9 @@
+{
+  "id": "slack:msg-001",
+  "source": "slack",
+  "sender": "Bob",
+  "title": null,
+  "content": "Production build failed for the Cluck In prototype.",
+  "timestamp": "2026-09-19T11:32:00+08:00",
+  "unread": true
+}

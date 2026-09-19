@@ -1,0 +1,7 @@
+{
+  "messageId": "slack:msg-001",
+  "decision": "urgent",
+  "relevance": 0.93,
+  "urgency": 0.88,
+  "reason": "The message reports a build failure related to the current task."
+}

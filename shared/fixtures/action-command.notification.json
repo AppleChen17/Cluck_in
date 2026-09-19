@@ -1,0 +1,9 @@
+{
+  "type": "SHOW_NOTIFICATION",
+  "timestamp": "2026-09-19T11:32:01+08:00",
+  "payload": {
+    "title": "Urgent Slack message",
+    "message": "Production build failed for the Cluck In prototype.",
+    "messageId": "slack:msg-001"
+  }
+}
