@@ -26,3 +26,14 @@ htmlcov/
 !.env.example
 .DS_Store
 Thumbs.db
+
+# Provider credentials
+credentials.json
+token.json
+client_secret*.json
+*.p12
+
+# Local caches and captured mail
+src/external/.cache/
+*.eml
+*.mbox

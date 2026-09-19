@@ -1,0 +1,32 @@
+# Paste this at https://api.slack.com/apps -> Create New App -> From an app manifest.
+# It sets the scopes, the event subscription and Socket Mode in one step, so the
+# only things left to do by hand are generating the app-level token, installing,
+# and inviting the bot into the channel.
+display_information:
+  name: Cluck In
+  description: Reads public channel messages so the focus chicken can decide what deserves an interruption.
+  background_color: "#2c2d30"
+features:
+  bot_user:
+    display_name: Cluck In
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      # Read messages in public channels the bot has been invited to.
+      - channels:history
+      # Look up channel metadata.
+      - channels:read
+      # Turn U0123ABCD into a readable display name. Without it the sender
+      # falls back to "Slack user U0123ABCD".
+      - users:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  # No public URL and no ngrok: the bot dials out over a WebSocket.
+  socket_mode_enabled: true
+  token_rotation_enabled: false

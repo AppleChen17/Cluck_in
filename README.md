@@ -10,12 +10,14 @@ The MVP scope, module responsibilities, state machine, key layout, and open ques
 | --- | --- | --- | --- |
 | `src/app/` | Main application, session state, mode switching, and controller | C# / .NET | Scaffold — prints a startup message |
 | `src/logitech/` | Logitech Creative Console adapter | C# / .NET | Empty class library |
-| `src/external/` | Gmail, Slack, and Calendar adapters | C# / .NET | Empty class library |
+| `src/external/` | Gmail and Slack adapters | Python / FastAPI | Implemented — polls Gmail over IMAP and Slack over Socket Mode, serves `ExternalMessage` on `:8100` |
 | `src/actions/` | Action and automation engine | C# / .NET | Empty class library |
 | `src/ai-engine/` | AI decision engine and HTTP API | Python / FastAPI | Skeleton — `/health`, `/analyze-message`, `/draft-reply` backed by `MockProvider` |
 | `src/web/` | Dashboard UI | React + TypeScript + Vite | Skeleton — static mock dashboard, no backend calls |
 
 The .NET solution (`CluckIn.sln`) contains one console app and three empty class libraries. The Python and web modules run independently of it.
+
+`src/external/` is written in Python even though `CluckIn.External.csproj` still sits in that directory and in the solution. The Gmail and Slack tooling is far better in Python (Gmail needs no library at all — `imaplib` and `email` are standard library), and `src/app` reaches it over localhost HTTP + JSON, exactly as it already has to reach `src/ai-engine`. The empty csproj is left in place deliberately; removing it would mean editing `CluckIn.sln`, the file most prone to merge conflicts here. See [`src/external/README.md`](src/external/README.md).
 
 `src/browser/` (a Chrome extension for the AI page gatekeeper) is proposed in the MVP spec but not scaffolded yet, and has no owner — see §4 and §14 of the spec.
 
@@ -52,6 +54,26 @@ src/ai-engine/.venv/Scripts/python.exe -m uvicorn app:app --app-dir src/ai-engin
 
 On macOS/Linux, use `src/ai-engine/.venv/bin/python` instead. Open <http://127.0.0.1:8000/docs> for the interactive API documentation. The service currently returns mock responses; see [`src/ai-engine/README.md`](src/ai-engine/README.md) and [`src/ai-engine/docs/Setup.md`](src/ai-engine/docs/Setup.md) for connecting a local Ollama model.
 
+### External adapters
+
+Uses a virtualenv at the repository root rather than inside the module, because
+the .NET SDK globs `src/external/` recursively and would walk a `.venv` there on
+every build.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r src\external\requirements.txt
+Copy-Item src\external\.env.example src\external\.env
+.\.venv\Scripts\python.exe -m uvicorn app:app --app-dir src\external --port 8100 --workers 1
+```
+
+With no credentials configured it serves the committed `shared/fixtures`
+messages, so `GET http://127.0.0.1:8100/messages` works on a fresh clone.
+Use `--workers 1` and no `--reload`: the message buffer is per-process.
+
+The HTTP contract is documented in [`src/external/docs/API.md`](src/external/docs/API.md);
+Gmail and Slack credential setup is in [`src/external/docs/Setup.md`](src/external/docs/Setup.md).
+
 ### Web dashboard
 
 ```sh
@@ -64,9 +86,9 @@ Open the local URL printed by Vite (normally <http://localhost:5173>). All data 
 
 ## Working agreement
 
-Each developer owns a module. Agree on shared contracts before adding dependencies between modules. No Gmail, Slack, Calendar, Logitech SDK, Ollama, or automation integration is wired up yet — `tests/` is also still empty.
+Each developer owns a module. Agree on shared contracts before adding dependencies between modules. Gmail and Slack are wired up in `src/external/`; Calendar, Ollama, and automation are not.
 
-@'
+Tests live in `src/external/tests/` and run from the repository root with `.\.venv\Scripts\python.exe -m pytest`. They need no credentials and no network. The root `tests/` directory is still empty.
 
 ## Logitech MX Creative Console
 
@@ -77,4 +99,3 @@ AI Assist state control, semantic event routing, and local Python HTTP integrati
 
 See [`CluckInPlugin/INTEGRATION.md`](CluckInPlugin/INTEGRATION.md) for the current interface,
 testing instructions, key mappings, and integration status.
-'@ | Add-Content .\README.md
