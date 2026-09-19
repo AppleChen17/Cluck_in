@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/task-analyze-request.schema.json",
+  "title": "TaskAnalyzeRequest",
+  "description": "A target application or webpage and working-context snapshot sent to AI for relevance classification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "target",
+    "context"
+  ],
+  "properties": {
+    "target": {
+      "$ref": "task-target.schema.json"
+    },
+    "context": {
+      "$ref": "session-context.schema.json"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields."
+    }
+  }
+}

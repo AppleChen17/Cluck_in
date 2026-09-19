@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/task-target.schema.json",
+  "title": "TaskTarget",
+  "description": "An application or webpage the user is attempting to open.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "name"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "app",
+        "web"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable application or website name."
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Current page or window title."
+    },
+    "url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Target URL when applicable."
+    },
+    "identifier": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Application identifier such as executable name when applicable."
+    }
+  }
+}

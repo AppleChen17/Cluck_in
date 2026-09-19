@@ -1,0 +1,14 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.9
+pydantic-settings>=2.4
+slack_sdk>=3.31
+
+# Test-only. jsonschema must NOT be imported by application code:
+# docs/data-contracts.md says "No validator dependency is added to application
+# modules". The [format-nongpl] extra pulls rfc3339-validator, without which the
+# date-time format checker is inert and timestamp assertions pass on naive
+# datetimes, defeating their purpose.
+pytest>=8.0
+jsonschema[format-nongpl]>=4.23
+httpx>=0.27

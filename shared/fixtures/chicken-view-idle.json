@@ -1,0 +1,9 @@
+{
+  "mood": "idle",
+  "chicken": "idle_00.png",
+  "fps": 2,
+  "loop": true,
+  "frameDir": "src/chicken/frames",
+  "nestIcon": "nest_icon.png",
+  "feedCount": 0
+}
