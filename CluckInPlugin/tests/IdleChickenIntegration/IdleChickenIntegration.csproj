@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="CluckInPlugin"><HintPath>../../bin/Debug/bin/CluckInPlugin.dll</HintPath></Reference>
+    <Reference Include="PluginApi"><HintPath>../../bin/Debug/bin/PluginApi.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

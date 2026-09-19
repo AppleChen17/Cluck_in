@@ -1,8 +1,9 @@
-"""Chicken moods for AppState.chicken.mood (MVP spec §10)."""
+"""Teammate chicken animation state machine."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from chicken_statistics import ChickenStatistics
 
 FRAMES_DIR = Path(__file__).resolve().parent / "frames"
 
@@ -29,7 +30,7 @@ FRAME_COUNTS = {
     "tired": _frame_count("tired", 2),
 }
 
-# Spec §10 fps. logitech can use this when pushing button 5.
+# Advance frames at the teammate-defined rate for the current mood.
 FPS = {
     "idle": 2,
     "start": 3,
@@ -46,12 +47,16 @@ PET_TICKS = FRAME_COUNTS["pet"]
 
 
 class ChickenAnim:
-    def __init__(self) -> None:
+    def __init__(self, statistics: ChickenStatistics | None = None) -> None:
         self.mood = "idle"
         self._return_to = "idle"
         self.frame = 0
         self._oneshot_left = 0
-        self.feed_count = 0
+        self.statistics = statistics or ChickenStatistics()
+
+    @property
+    def feed_count(self):
+        return self.statistics.data["feedCount"]
 
     def handle_event(self, event: str, payload: dict | None = None) -> dict:
         payload = payload or {}
@@ -68,16 +73,19 @@ class ChickenAnim:
         elif name in {"STOP_FOCUS", "endFocus", "roam"}:
             self._enter("idle")
         elif name in {"PET_CHICKEN", "pet", "pat", "pad"}:
+            self.statistics.pet()
             self._oneshot("pet", PET_TICKS)
         elif name in {"FEED_CHICKEN", "feed"}:
-            if self.feed_count > 0:
-                self.feed_count -= 1
-            self._oneshot("feed", FEED_TICKS, return_to="idle")
+            if self.statistics.consume_feed():
+                self._oneshot("feed", FEED_TICKS, return_to="idle")
         elif name in {"SET_MOOD", "setMood"}:
             mood = str(payload.get("mood", self.mood))
             self._enter(mood)
         elif name == "SET_FEED":
-            self.feed_count = int(payload.get("count", self.feed_count))
+            self.statistics.set_feed(payload.get("count", self.feed_count))
+        elif name == "RECORD_FOCUS":
+            self.statistics.record_focus(payload.get("sessionId"), payload.get("seconds"),
+                                         payload.get("completed"))
         else:
             raise ValueError(f"unknown event: {event}")
         return self.get_view()
@@ -100,7 +108,7 @@ class ChickenAnim:
             "displayKey": 6 if in_nest else 5,
             "nestIcon": nest_icon,
             "deskEmpty": "desk_empty.png",
-            "feedCount": self.feed_count,
+            **self.statistics.snapshot(),
         }
 
     def _enter(self, mood: str) -> None:

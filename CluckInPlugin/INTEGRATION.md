@@ -143,12 +143,12 @@ AI_ASSIST_ON
 | Key | Focus | Idle | Event behavior |
 |---|---|---|---|
 | 1 | Change to Idle | Change to Focus | Send once on state change |
-| 2 | Show message/popup screen | Feed chicken | One-shot |
-| 3 | AI Assist Off/Suggestion/On | Pet chicken | Send once when AI level changes / one-shot pet |
-| 4 | Enter task selector | Enter task selector | Send SELECT_TASK only after confirmation |
-| 5 | Reserved | Reserved | TBD |
-| 6 | Reserved | Reserved | TBD |
-| 7-9 | Focus timer selection/countdown | Focus timer selection/countdown | Confirm duration once; display countdown |
+| 2 | Show message/popup screen | PET | One-shot PET_CHICKEN |
+| 3 | AI Assist Off/Suggestion/On | Inventory / FEED | FEED_CHICKEN; consume only if available |
+| 4 | Enter task selector | Pat count / PATS | Idle is read-only |
+| 5 | START / PAUSE / RESUME | Chicken animation, no text | Existing Focus behavior |
+| 6 | END | Successful feed count / FED | Idle is read-only |
+| 7-9 | Focus timer selection/countdown | Cumulative HH / HR, MM / MIN, SS / SEC | Idle is read-only |
 
 ---
 
@@ -213,11 +213,11 @@ OPEN_MESSAGE_SCREEN
 
 ### Idle
 
-Key 2 feeds the chicken.
+Key 2 pets the chicken.
 
 ```text
 Key 2
--> FEED_CHICKEN
+-> PET_CHICKEN
 ```
 
 Each press sends one event.
@@ -226,7 +226,8 @@ Each press sends one event.
 
 ## 8. Key 3 - AI Assist policy
 
-Key 3 controls how much authority AI has.
+In Focus, Key 3 controls how much authority AI has. In Idle, each press sends
+`FEED_CHICKEN` once and displays inventory above `FEED`.
 
 It does not start or stop the AI engine process.
 
@@ -454,7 +455,8 @@ Key 2
 -> send once per press
 
 Key 3
--> send once when AI Assist level changes
+-> Focus: send once when AI Assist level changes
+-> Idle: send FEED_CHICKEN once per press
 
 Key 4
 -> no event while browsing tasks
@@ -726,3 +728,73 @@ docs/**
 ## 21. Short explanation for teammates
 
 > I own the Logitech adapter, not one C# file. The MX Creative Console is already connected to MainController and can send normalized events to Python over HTTP. Key 1 controls Idle/Focus, Key 2 is a one-shot UI/pet action, Key 3 controls the AI Assist policy Off/Suggestion/On and sends one event only when that policy changes, Key 4 will use the dial for task selection, and Keys 7-9 will use the dial for focus-duration selection and countdown display. Background message fetching, desktop monitoring, AI processing, and the authoritative timer stay in App/Python services.
+
+
+## Teammate chicken preview (Idle verification)
+
+From the repository root:
+
+```powershell
+python -m pip install -r src/chicken/requirements.txt
+python -B src/chicken/test_states.py
+python -B src/chicken/preview.py
+```
+
+The existing Tk preview uses `ChickenAnim` and `src/chicken/frames` directly.
+It starts in `idle`, looping `idle_00.png` through `idle_03.png` at 2 fps.
+The preview's IDLE button sends `STOP_FOCUS` to return to that sequence.
+The test script prints state transitions; it is not an assertion-based test suite.
+
+The Tk preview is standalone. Idle Key 5 now uses the existing chicken API:
+
+```powershell
+python -m uvicorn api:app --app-dir src/chicken --host 127.0.0.1 --port 8001
+```
+
+Keep that service running. `IdleChickenAnimation` sends `SET_MOOD` with
+`mood=idle` on Idle entry, forwards local pet/feed actions, and sends `tick`
+at the `fps` returned by Python. Python alone selects the frames and handles
+one-shot return states. The adapter downloads `/frames/{chicken}` and
+invalidates only Key 5. It stops ticking in Focus and cancels on plugin unload.
+`CLUCKIN_CHICKEN_URL` can override the API base URL (include the trailing slash).
+Do not run another tick producer against the same API instance.
+
+Idle Key 5 has no timer label. Frames use the common API `idleCrop` with
+nearest-neighbor scaling, preserving every visible pixel including hearts. No assets are copied into the
+plugin. If the API is unavailable, the adapter logs once, retries, and resets
+to Idle after reconnecting. It retains the last frame until a new one arrives.
+
+Focus Key 5 still uses the existing desk/progress images and START/PAUSE/RESUME
+labels. The chicken view's nest fields are not applied in Idle. Keys 6?9 show
+statistics only in Idle; their Focus behavior is unchanged. Existing input events to port 8765 remain unchanged; that receiver
+must not also forward pet/feed to this API, or it would deliver each event twice.
+
+Integration test (after building CluckInPlugin):
+
+```powershell
+# Supply a Python interpreter with src/chicken/requirements.txt installed.
+dotnet run --project CluckInPlugin/tests/IdleChickenIntegration -- python
+```
+
+The test launches an isolated chicken API on a free local port, verifies the
+real state machine and Key 5 frame updates, and shuts down its API afterward.
+
+
+## Idle dashboard state and verification
+
+Key 1 displays FOCUS as its destination; Key 2 displays PET. Keys 3/4/6 use
+native dynamic command text for a number and FEED/PATS/FED. Keys 7/8/9 use
+native text for cumulative HH/HR, MM/MIN, SS/SEC. Until an API snapshot arrives,
+statistics show `--` rather than inventing a zero balance. Keys 4 and 6?9 do
+nothing when pressed in Idle.
+
+All totals come from Python; the plugin caches only its display snapshot.
+See `src/chicken/INTEGRATION.md` for persistence and earning rules. Actual focus
+progress requires the desktop app; the PAD countdown mirror alone grants no
+credit. The existing port 8765 receiver has not been rewritten for this layout.
+
+Physical check: enter Idle and verify all nine displays. Press PET and check
+PATS increases. Complete a desktop focus session to earn one feed. In Idle,
+press FEED: inventory decreases, FED increases, and the feed sequence plays.
+At zero inventory, another press changes neither count nor animation. Switch
+to Focus and verify the existing controls and timer selection still work.

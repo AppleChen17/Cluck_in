@@ -7,5 +7,8 @@
   "displayKey": 6,
   "nestIcon": "focused_00.png",
   "deskEmpty": "desk_empty.png",
-  "feedCount": 1
+  "feedCount": 1,
+  "patCount": 0,
+  "successfulFeedCount": 0,
+  "totalFocusSeconds": 0
 }

@@ -1,4 +1,4 @@
-namespace Loupedeck.CluckInPlugin
+﻿namespace Loupedeck.CluckInPlugin
 {
     using System;
 
@@ -25,11 +25,16 @@ namespace Loupedeck.CluckInPlugin
         // This method is called when the plugin is loaded.
         public override void Load()
         {
+            IdleChickenAnimation.Start();
+            FocusChickenAnimation.Start();
         }
 
         // This method is called when the plugin is unloaded.
         public override void Unload()
         {
+            FocusChickenAnimation.Stop();
+            IdleChickenAnimation.Stop();
         }
     }
 }
+

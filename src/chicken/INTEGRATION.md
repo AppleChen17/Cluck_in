@@ -57,7 +57,7 @@ This module does not own keys 1–4 or 7–9.
 ## Frame rules (Main MUST follow)
 
 - Files are **64×128** PNG, RGBA, sprite bottom-aligned. Hearts sit above the chick.
-- Draw the **entire** bitmap into the square key. Do **not** crop the top half.
+- Preserve all visible content, including hearts. Idle consumers may use `idleCrop`, one transparent-padding crop measured across every idle/pet/feed frame. Never crop or rescale each frame independently.
 - Scale with **nearest-neighbor** only.
 - Do not require 118×118 sources. Fit 64×128 onto the key.
 
@@ -78,6 +78,10 @@ Returned by `GET /view` and `POST /event`. Schema: `shared/schemas/chicken-view.
   "nestIcon": "",
   "deskEmpty": "desk_empty.png",
   "feedCount": 0,
+  "patCount": 0,
+  "successfulFeedCount": 0,
+  "totalFocusSeconds": 0,
+  "idleCrop": { "x": 7, "y": 76, "width": 49, "height": 52 },
   "chickenUrl": "/frames/idle_00.png"
 }
 ```
@@ -117,7 +121,7 @@ There is **no** `happy` mood and **no** `SESSION_DONE` event.
 | `FOCUS_PAUSE` | `{}` | `mood=paused` — at desk, with milk |
 | `STOP_FOCUS` | `{}` | `mood=idle` |
 | `PET_CHICKEN` | `{}` | oneshot `pet`, then previous mood |
-| `FEED_CHICKEN` | `{}` | oneshot `feed`, then `idle`; if `feedCount>0` then `feedCount-=1` |
+| `FEED_CHICKEN` | `{}` | With inventory: consume one, count a successful feed, play `feed`, return to `idle`. At zero: no animation or count change. |
 | `SET_MOOD` | `{ "mood": "<enum>" }` | enter that mood (AI wait: `thinking`) |
 | `SET_FEED` | `{ "count": 0 }` | set `feedCount` |
 
@@ -167,3 +171,45 @@ Use the `FOCUS_*` names in the table. `START`, `START_FOCUS`, `PAUSE_FOCUS`, and
 - Running or calling Ollama
 - Roaming onto other keys
 - `happy` / session-complete celebration
+
+
+## Persistent Idle statistics and food economy
+
+The API owns the single canonical inventory/statistics store at
+`%LOCALAPPDATA%/CluckIn/chicken-state.json` on Windows. Override with
+`CLUCKIN_CHICKEN_STATE_PATH`. Run one API worker per state file. The standalone
+preview keeps temporary in-memory demo state and does not consume saved inventory.
+
+- `feedCount`: remaining inventory (the existing field, now persistent).
+- `patCount`: cumulative accepted `PET_CHICKEN` actions, counted when started.
+- `successfulFeedCount`: cumulative feeds that consumed an item.
+- `totalFocusSeconds`: cumulative actual desktop-timer seconds, excluding pauses.
+- `idleCrop`: API-only shared rectangle for all idle/pet/feed frames with up to
+  two pixels of transparent margin. Original PNGs are unchanged.
+
+`RECORD_FOCUS` accepts `sessionId` (stable string), `seconds` (non-negative integer)
+and `completed` (boolean). Only progress beyond the session's prior maximum is
+added. First completion awards one feed item, as specified in PRODUCT_SPEC_MVP.
+Repeated/older receipts cannot duplicate time or rewards, even after restart.
+Early-stopped sessions count actual time but earn no feed. Fractional seconds are
+rounded down per session. Historical totals before this store existed cannot be
+reconstructed and start at zero. There is no second C# inventory or total counter.
+
+The desktop app observes its existing timer through `ProgressTrackingTimer`.
+`ChickenProgressReporter` queues unacknowledged measurements durably in
+`%LOCALAPPDATA%/CluckIn/focus-outbox.json`, retrying when the API becomes available.
+`CLUCKIN_FOCUS_OUTBOX_PATH` isolates test delivery state. This observer does not
+change timer transition rules. The Logitech countdown mirror does not award credit.
+
+The Idle PAD layout uses native text for FOCUS, PET, inventory/FEED, pats/PATS,
+successful feeds/FED, and cumulative HH/HR, MM/MIN, SS/SEC. Key 5 remains the
+teammate animation. This Idle layout supersedes the earlier preview key layout;
+Focus controls are unchanged.
+
+Tests:
+
+```powershell
+python -m pip install -r src/chicken/requirements-test.txt
+python -B src/chicken/test_states.py
+python -B -m unittest discover -s src/chicken -p test_idle_state.py -v
+```
