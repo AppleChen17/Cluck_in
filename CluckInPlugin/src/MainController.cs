@@ -2,11 +2,25 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 public static class MainController{
     private const int DefaultFocusHours = 0;
     private const int DefaultFocusMinutes = 25;
     private const int DefaultFocusSeconds = 0;
+
+    private static readonly object _focusTimerLock = new();
+
+    private static readonly Timer _countdownRefreshTimer = new(
+        _ => RefreshCountdownDisplay(),
+        null,
+        Timeout.Infinite,
+        Timeout.Infinite
+    );
+
+    private static DateTimeOffset _runningSince;
+    private static int _remainingAtRunStartSeconds;
+    private static int _remainingFocusSeconds;
 
     public static CluckInMode CurrentMode {get; private set;} = CluckInMode.Focus;
 
@@ -32,6 +46,32 @@ public static class MainController{
         (SelectedFocusHours * 3600) +
         (SelectedFocusMinutes * 60) +
         SelectedFocusSeconds;
+
+    public static int DisplayFocusDurationSeconds{
+        get{
+            lock(_focusTimerLock){
+                return CurrentFocusTimerState switch{
+                    FocusTimerControlState.Running =>
+                        CalculateRemainingSecondsNoLock(),
+                    FocusTimerControlState.Paused =>
+                        _remainingFocusSeconds,
+                    FocusTimerControlState.Completed =>
+                        0,
+                    _ =>
+                        SelectedFocusDurationSeconds
+                };
+            }
+        }
+    }
+
+    public static int DisplayFocusHours =>
+        DisplayFocusDurationSeconds / 3600;
+
+    public static int DisplayFocusMinutes =>
+        (DisplayFocusDurationSeconds % 3600) / 60;
+
+    public static int DisplayFocusSeconds =>
+        DisplayFocusDurationSeconds % 60;
 
     public static event Action ModeChanged;
     public static event Action AIAssistModeChanged;
@@ -97,9 +137,16 @@ public static class MainController{
             return;
         }
 
-        if(CurrentFocusTimerState != FocusTimerControlState.Ready){
+        if(CurrentFocusTimerState is
+            FocusTimerControlState.Running or
+            FocusTimerControlState.Paused)
+        {
             PluginLog.Info("Focus duration change ignored while timer is active");
             return;
+        }
+
+        if(CurrentFocusTimerState == FocusTimerControlState.Completed){
+            CurrentFocusTimerState = FocusTimerControlState.Ready;
         }
 
         switch(CurrentFocusTimerField){
@@ -141,15 +188,22 @@ public static class MainController{
     }
 
     public static void ResetFocusDuration(){
-        if(CurrentFocusTimerState != FocusTimerControlState.Ready){
+        if(CurrentFocusTimerState is
+            FocusTimerControlState.Running or
+            FocusTimerControlState.Paused)
+        {
             PluginLog.Info("Focus duration reset ignored while timer is active");
             return;
         }
 
-        SelectedFocusHours = DefaultFocusHours;
-        SelectedFocusMinutes = DefaultFocusMinutes;
-        SelectedFocusSeconds = DefaultFocusSeconds;
-        CurrentFocusTimerField = FocusTimerField.Minutes;
+        lock(_focusTimerLock){
+            SelectedFocusHours = DefaultFocusHours;
+            SelectedFocusMinutes = DefaultFocusMinutes;
+            SelectedFocusSeconds = DefaultFocusSeconds;
+            CurrentFocusTimerField = FocusTimerField.Minutes;
+            CurrentFocusTimerState = FocusTimerControlState.Ready;
+            _remainingFocusSeconds = 0;
+        }
 
         PluginLog.Info(
             $"Focus duration reset to {SelectedFocusHours:00}:{SelectedFocusMinutes:00}:{SelectedFocusSeconds:00}"
@@ -289,6 +343,7 @@ public static class MainController{
 
         switch(CurrentFocusTimerState){
             case FocusTimerControlState.Ready:
+            case FocusTimerControlState.Completed:
                 if(SelectedFocusDurationSeconds <= 0){
                     PluginLog.Info("Focus timer start ignored because duration is zero");
                     return;
@@ -303,7 +358,7 @@ public static class MainController{
                     5
                 );
 
-                SetFocusTimerState(FocusTimerControlState.Running);
+                StartLocalCountdownMirror();
                 break;
 
             case FocusTimerControlState.Running:
@@ -313,7 +368,7 @@ public static class MainController{
                     5
                 );
 
-                SetFocusTimerState(FocusTimerControlState.Paused);
+                PauseLocalCountdownMirror();
                 break;
 
             case FocusTimerControlState.Paused:
@@ -323,7 +378,7 @@ public static class MainController{
                     5
                 );
 
-                SetFocusTimerState(FocusTimerControlState.Running);
+                ResumeLocalCountdownMirror();
                 break;
 
             default:
@@ -334,7 +389,10 @@ public static class MainController{
     }
 
     private static void HandleFocusStopKey(){
-        if(CurrentFocusTimerState == FocusTimerControlState.Ready){
+        if(CurrentFocusTimerState is
+            FocusTimerControlState.Ready or
+            FocusTimerControlState.Completed)
+        {
             PluginLog.Info("Focus timer is not active");
             return;
         }
@@ -345,15 +403,107 @@ public static class MainController{
             6
         );
 
-        SetFocusTimerState(FocusTimerControlState.Ready);
+        StopLocalCountdownMirror();
     }
 
-    private static void SetFocusTimerState(FocusTimerControlState state){
-        CurrentFocusTimerState = state;
+    private static void StartLocalCountdownMirror(){
+        lock(_focusTimerLock){
+            _remainingFocusSeconds = SelectedFocusDurationSeconds;
+            _remainingAtRunStartSeconds = _remainingFocusSeconds;
+            _runningSince = DateTimeOffset.UtcNow;
+            CurrentFocusTimerState = FocusTimerControlState.Running;
+            _countdownRefreshTimer.Change(0, 250);
+        }
 
-        PluginLog.Info($"Focus timer control state changed to {state}");
+        PluginLog.Info("Local countdown display mirror started");
 
         FocusTimerChanged?.Invoke();
+    }
+
+    private static void PauseLocalCountdownMirror(){
+        lock(_focusTimerLock){
+            _remainingFocusSeconds = CalculateRemainingSecondsNoLock();
+            CurrentFocusTimerState = FocusTimerControlState.Paused;
+            _countdownRefreshTimer.Change(
+                Timeout.Infinite,
+                Timeout.Infinite
+            );
+        }
+
+        PluginLog.Info("Local countdown display mirror paused");
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    private static void ResumeLocalCountdownMirror(){
+        lock(_focusTimerLock){
+            _remainingAtRunStartSeconds = _remainingFocusSeconds;
+            _runningSince = DateTimeOffset.UtcNow;
+            CurrentFocusTimerState = FocusTimerControlState.Running;
+            _countdownRefreshTimer.Change(0, 250);
+        }
+
+        PluginLog.Info("Local countdown display mirror resumed");
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    private static void StopLocalCountdownMirror(){
+        lock(_focusTimerLock){
+            _remainingFocusSeconds = 0;
+            CurrentFocusTimerState = FocusTimerControlState.Ready;
+            _countdownRefreshTimer.Change(
+                Timeout.Infinite,
+                Timeout.Infinite
+            );
+        }
+
+        PluginLog.Info("Local countdown display mirror stopped");
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    private static void RefreshCountdownDisplay(){
+        var completed = false;
+
+        lock(_focusTimerLock){
+            if(CurrentFocusTimerState != FocusTimerControlState.Running){
+                return;
+            }
+
+            _remainingFocusSeconds = CalculateRemainingSecondsNoLock();
+
+            if(_remainingFocusSeconds <= 0){
+                _remainingFocusSeconds = 0;
+                CurrentFocusTimerState = FocusTimerControlState.Completed;
+                _countdownRefreshTimer.Change(
+                    Timeout.Infinite,
+                    Timeout.Infinite
+                );
+                completed = true;
+            }
+        }
+
+        if(completed){
+            PluginLog.Info("Local countdown display mirror completed");
+        }
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    private static int CalculateRemainingSecondsNoLock(){
+        if(CurrentFocusTimerState != FocusTimerControlState.Running){
+            return _remainingFocusSeconds;
+        }
+
+        var elapsedSeconds = (int)Math.Floor(
+            (DateTimeOffset.UtcNow - _runningSince).TotalSeconds
+        );
+
+        return Math.Max(
+            0,
+            _remainingAtRunStartSeconds - elapsedSeconds
+        );
     }
 
     private static void RequestAction(

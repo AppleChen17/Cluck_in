@@ -18,6 +18,7 @@
                 groupName: "CluckIn",
                 hasReset: true)
         {
+            MainController.FocusTimerChanged += this.OnTimerChanged;
         }
 
         protected override void ApplyAdjustment(
@@ -46,16 +47,19 @@
 
         protected override void RunCommand(String actionParameter)
         {
-            MainController.HandleKeyEvent(5);
-
+            MainController.ResetFocusDuration();
             this.AdjustmentValueChanged();
         }
 
         protected override String GetAdjustmentValue(String actionParameter)
         {
-            return $"{MainController.SelectedFocusHours:00}:" +
-                   $"{MainController.SelectedFocusMinutes:00}:" +
-                   $"{MainController.SelectedFocusSeconds:00}";
+            return $"{MainController.DisplayFocusHours:00}:" +
+                   $"{MainController.DisplayFocusMinutes:00}:" +
+                   $"{MainController.DisplayFocusSeconds:00}";
+        }
+
+        private void OnTimerChanged(){
+            this.AdjustmentValueChanged();
         }
     }
 }

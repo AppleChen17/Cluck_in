@@ -25,7 +25,7 @@ public class TimerMinuteCommand : PluginDynamicCommand{
                 ? "MIN"
                 : "min";
 
-        return $"{MainController.SelectedFocusMinutes:00}" +
+        return $"{MainController.DisplayFocusMinutes:00}" +
                $"{Environment.NewLine}{label}";
     }
 

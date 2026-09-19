@@ -29,6 +29,7 @@ public class FocusControlCommand : PluginDynamicCommand{
             FocusTimerControlState.Ready => "START",
             FocusTimerControlState.Running => "PAUSE",
             FocusTimerControlState.Paused => "RESUME",
+            FocusTimerControlState.Completed => "START",
             _ => "FOCUS"
         };
     }

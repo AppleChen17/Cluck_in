@@ -726,3 +726,43 @@ docs/**
 ## 21. Short explanation for teammates
 
 > I own the Logitech adapter, not one C# file. The MX Creative Console is already connected to MainController and can send normalized events to Python over HTTP. Key 1 controls Idle/Focus, Key 2 is a one-shot UI/pet action, Key 3 controls the AI Assist policy Off/Suggestion/On and sends one event only when that policy changes, Key 4 will use the dial for task selection, and Keys 7-9 will use the dial for focus-duration selection and countdown display. Background message fetching, desktop monitoring, AI processing, and the authoritative timer stay in App/Python services.
+
+Timer controls
+
+Key 7:
+- Select/display hours
+
+Key 8:
+- Select/display minutes
+
+Key 9:
+- Select/display seconds
+
+Roller:
+- Adjust currently selected field
+
+Focus events:
+- START_FOCUS
+- PAUSE_FOCUS
+- RESUME_FOCUS
+- STOP_FOCUS
+
+START_FOCUS payload:
+{
+  "focusDurationSeconds": <total seconds>
+}
+
+Verified hardware example:
+00:30:30
+-> focusDurationSeconds = 1830
+
+Countdown:
+- App TimerManager remains authoritative.
+- Logitech countdown is currently a local display mirror.
+- When App state feed is available, Logitech display should use
+  App FocusSession.RemainingTime instead.
+
+Planned visual layer:
+- Running: chicken working at desk
+- Paused: chicken drinking tea
+- Stop/end: chicken returns to coop

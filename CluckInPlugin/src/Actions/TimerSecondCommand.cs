@@ -25,7 +25,7 @@ public class TimerSecondCommand : PluginDynamicCommand{
                 ? "SEC"
                 : "sec";
 
-        return $"{MainController.SelectedFocusSeconds:00}" +
+        return $"{MainController.DisplayFocusSeconds:00}" +
                $"{Environment.NewLine}{label}";
     }
 

@@ -25,7 +25,7 @@ public class TimerHourCommand : PluginDynamicCommand{
                 ? "HR"
                 : "hr";
 
-        return $"{MainController.SelectedFocusHours:00}" +
+        return $"{MainController.DisplayFocusHours:00}" +
                $"{Environment.NewLine}{label}";
     }
 

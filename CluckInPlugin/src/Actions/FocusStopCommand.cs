@@ -20,10 +20,11 @@ public class FocusStopCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
-        return MainController.CurrentFocusTimerState ==
-            FocusTimerControlState.Ready
-                ? "END"
-                : "STOP";
+        return MainController.CurrentFocusTimerState switch{
+            FocusTimerControlState.Running => "STOP",
+            FocusTimerControlState.Paused => "STOP",
+            _ => "END"
+        };
     }
 
     private void OnStateChanged(){
