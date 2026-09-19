@@ -1,4 +1,4 @@
 {
-  "type": "PAUSE_FOCUS",
+  "type": "FOCUS_PAUSE",
   "payload": {}
 }

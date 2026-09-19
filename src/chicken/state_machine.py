@@ -7,12 +7,12 @@ from chicken_statistics import ChickenStatistics
 
 FRAMES_DIR = Path(__file__).resolve().parent / "frames"
 
-# Supported moods, including one-shot pet and feed animations.
-MOODS = ("idle", "focused", "thinking", "feed", "pet", "paused", "tired")
+# Schema moods plus feed (餵食，一次性吃東西動畫).
+MOODS = ("idle", "start", "focused", "thinking", "feed", "pet", "paused", "tired")
 ONESHOT_MOODS = frozenset({"feed", "pet"})
-NEST_MOODS = frozenset({"paused"})  # Paused chicken occupies the nest.
-# These moods also show the nest in the standalone preview.
-SESSION_MOODS = frozenset({"focused", "thinking", "pet", "paused"})
+NEST_MOODS = frozenset({"focused"})  # 雞畫在第六格巢裡
+# 書桌+鳥巢只存在番茄鐘場景；idle / feed 沒有巢。
+SESSION_MOODS = frozenset({"start", "focused", "thinking", "pet", "paused"})
 
 def _frame_count(mood: str, fallback: int) -> int:
     n = len(list(FRAMES_DIR.glob(f"{mood}_*.png")))
@@ -21,22 +21,24 @@ def _frame_count(mood: str, fallback: int) -> int:
 
 FRAME_COUNTS = {
     "idle": _frame_count("idle", 4),
-    "focused": _frame_count("focused", 4),
+    "start": _frame_count("start", 4),
+    "focused": _frame_count("focused", 5),
     "thinking": _frame_count("thinking", 2),
     "feed": _frame_count("feed", 2),
     "pet": _frame_count("pet", 12),
-    "paused": _frame_count("paused", 5),
+    "paused": _frame_count("paused", 4),
     "tired": _frame_count("tired", 2),
 }
 
 # Advance frames at the teammate-defined rate for the current mood.
 FPS = {
     "idle": 2,
-    "focused": 3,
+    "start": 3,
+    "focused": 2,
     "thinking": 4,
     "feed": 4,
     "pet": 4,
-    "paused": 2,
+    "paused": 3,
     "tired": 1,
 }
 
@@ -62,12 +64,12 @@ class ChickenAnim:
 
         if name == "tick":
             self._tick()
-        elif name in {"START_FOCUS", "startFocus"}:
+        elif name in {"FOCUS_START", "START", "start"}:
+            self._enter("start")
+        elif name in {"FOCUS_DEFAULT", "START_FOCUS", "startFocus", "RESUME_FOCUS", "resumeFocus", "resume"}:
             self._enter("focused")
-        elif name in {"PAUSE_FOCUS", "pauseFocus", "pause"}:
+        elif name in {"FOCUS_PAUSE", "PAUSE_FOCUS", "pauseFocus", "pause"}:
             self._enter("paused")
-        elif name in {"RESUME_FOCUS", "resumeFocus", "resume"}:
-            self._enter("focused")
         elif name in {"STOP_FOCUS", "endFocus", "roam"}:
             self._enter("idle")
         elif name in {"PET_CHICKEN", "pet", "pat", "pad"}:

@@ -4,6 +4,15 @@ pydantic>=2.9
 pydantic-settings>=2.4
 slack_sdk>=3.31
 
+# Google Calendar only, and imported lazily: CALENDAR_BACKEND=memory (the
+# default) never touches them, so a partial install still runs the service.
+# Gmail deliberately needs neither -- an app password covers IMAP and SMTP.
+# The calendar cannot do the same: Google Calendar has no IMAP, its CalDAV
+# endpoint stopped accepting basic auth years ago, and the secret iCal URL is
+# read-only. OAuth is the only way to write an event.
+google-api-python-client>=2.140
+google-auth-oauthlib>=1.2
+
 # Test-only. jsonschema must NOT be imported by application code:
 # docs/data-contracts.md says "No validator dependency is added to application
 # modules". The [format-nongpl] extra pulls rfc3339-validator, without which the

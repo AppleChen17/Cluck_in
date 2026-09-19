@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 import normalize
 from adapters.source_adapter import MessageSink, SourceAdapter
 from config import Settings
+from reply_registry import ReplyTarget
 from schemas import ExternalMessage
 
 log = logging.getLogger("external.slack")
@@ -108,6 +109,23 @@ def build_message(
     )
 
 
+def build_reply_target(event: dict, message_id: str) -> ReplyTarget:
+    """Pure: where a reply to this Slack message goes.
+
+    thread_ts falls back to ts, which is what turns a reply to a loose channel
+    message into the first message of a new thread rather than another loose
+    message beside it.
+    """
+    ts = str(event["ts"])
+    return ReplyTarget(
+        message_id=message_id,
+        source="slack",
+        channel=str(event["channel"]),
+        ts=ts,
+        thread_ts=str(event.get("thread_ts") or ts),
+    )
+
+
 class SlackAdapter(SourceAdapter):
     name = "slack"
 
@@ -185,6 +203,7 @@ class SlackAdapter(SourceAdapter):
             max_chars=self._cfg.external_max_content_chars,
             resolve_user=self._resolve_user,
         )
+        self._remember_target(build_reply_target(event, message.id))
         if self._sink is not None and self._sink(message):
             self._mark_emitted(message.timestamp)
 

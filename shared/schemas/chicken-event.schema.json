@@ -13,6 +13,10 @@
       "type": "string",
       "enum": [
         "tick",
+        "FOCUS_START",
+        "FOCUS_DEFAULT",
+        "FOCUS_PAUSE",
+        "START",
         "START_FOCUS",
         "STOP_FOCUS",
         "PAUSE_FOCUS",
@@ -32,6 +36,7 @@
           "type": "string",
           "enum": [
             "idle",
+            "start",
             "focused",
             "thinking",
             "feed",

@@ -1,0 +1,9 @@
+{
+  "messageId": "slack:C08ABCDEF:1789788999.000100",
+  "intent": "meeting_invite",
+  "confidence": 0.71,
+  "reason": "提到要開會，但沒有給出可用的日期時間。",
+  "startTime": null,
+  "endTime": null,
+  "title": null
+}

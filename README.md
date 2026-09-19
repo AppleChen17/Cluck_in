@@ -10,7 +10,7 @@ The MVP scope, state machine, key layout and open questions are in [docs/PRODUCT
 | --- | --- | --- | --- |
 | `src/app/` | Desktop app: focus timer, workspace and task rules, foreground-window and browser-URL sampling, chicken intervention window, HTTP API on `:5180` | C# / WPF / .NET 10 (Windows) | Implemented — see [`src/app/README.md`](src/app/README.md) |
 | `CluckInPlugin/` | Logitech MX Creative Console plugin: physical keys, key-face state, Idle/Focus and AI Assist control, posts input events over HTTP | C# / .NET 10 | Implemented — see [`CluckInPlugin/INTEGRATION.md`](CluckInPlugin/INTEGRATION.md) |
-| `src/external/` | Gmail (IMAP) and Slack (Socket Mode) normalized into `ExternalMessage`, served on `:8100` | Python / FastAPI | Implemented — see [`src/external/README.md`](src/external/README.md) |
+| `src/external/` | Gmail (IMAP) and Slack (Socket Mode) normalized into `ExternalMessage`; sends replies back out over SMTP and `chat.postMessage`; reads and writes Google Calendar. On `:8100` | Python / FastAPI | Implemented, and verified end to end against real accounts — see [`src/external/README.md`](src/external/README.md) |
 | `src/ai-engine/` | Decision engine over a local Ollama model: `/analyze-message`, `/analyze-task`, on `:8000` | Python / FastAPI | Implemented — see [`src/ai-engine/README.md`](src/ai-engine/README.md) |
 | `src/web/` | Dashboard, task launcher, workspace rules editor and intervention prompt, on `:5173` | React + TypeScript + Vite | Task launcher and intervention call the app's API; the timer and AI cards and the workspace rules editor are still mock data |
 | `src/app-demo/` | The original console entry point; prints context and evaluation snapshots | C# / .NET 10 | Works, kept for debugging |
@@ -41,9 +41,11 @@ Everything is localhost HTTP with JSON. No two modules share a process.
                                             /api/tasks  /api/session
                                                /api/intervention
 
-  Gmail --+
-          +--> src/external :8100 --> (no consumer yet)
-  Slack --+
+  Gmail --+                                 +--> Gmail (SMTP)
+          +--> src/external :8100 -- sends --+--> Slack (chat.postMessage)
+  Slack --+              |                   +--> Google Calendar
+                         +-- GET /messages, POST /reply, /calendar/*
+                                 (no C# consumer yet)
 
   src/ai-engine :8000 --> Ollama :11434       (no consumer yet)
 ```
@@ -52,7 +54,7 @@ Everything is localhost HTTP with JSON. No two modules share a process.
 | --- | --- | --- |
 | `5173` | `src/web` (Vite) | Proxies `/api` to `127.0.0.1:5180` |
 | `5180` | `src/app` HTTP API | Loopback only; checks Host and Origin |
-| `8100` | `src/external` | Run with `--workers 1`; the message buffer is per-process |
+| `8100` | `src/external` | Run with `--workers 1`; the message buffer and the reply registry are per-process |
 | `8000` | `src/ai-engine` | `start.py` starts Ollama if it is not already running |
 | `8765` | — | Where `CluckInPlugin` posts; only `CluckInPlugin/tools/mock_receiver.py` answers |
 | `11434` | Ollama | Started by `src/ai-engine/start.py` |
@@ -62,22 +64,27 @@ Everything is localhost HTTP with JSON. No two modules share a process.
 The modules work. The seams between them mostly do not. In rough priority order:
 
 1. **Logitech to app.** The plugin posts `InputEvent` to `127.0.0.1:8765/input-event`. Nothing in `src/app` listens there — its API is on `:5180` with different routes. The flow has been verified only against `CluckInPlugin/tools/mock_receiver.py`.
-2. **Gmail and Slack to app.** `src/external` serves contract-valid messages on `:8100`, but no C# client polls it.
-3. **AI to app.** `src/ai-engine` serves `/analyze-message` and `/analyze-task`, but nothing calls either.
+2. **Gmail and Slack to app, in both directions.** `src/external` serves messages on `:8100`, accepts replies on `POST /reply`, reactions on `POST /react`, and reads and writes Google Calendar on `/calendar/*`. **No C# client calls any of it.** What is missing is the decision, which is `src/app`'s by design: poll `/messages`, decide whether a message deserves an answer *given the current focus session and task*, and post that answer back. `src/external/scripts/auto_reply_demo.py` runs that loop standalone today — read it for the shape of the calls, not as a model of the logic, because it decides with no session context at all and answers anything that looks like a meeting.
+3. **AI to app — and one endpoint nobody has written yet.** `src/ai-engine` serves `/analyze-message` and `/analyze-task`; nothing calls either. Auto-reply needs a third thing neither can answer: *is this person asking when I am free, telling me a meeting time, or neither?* `/analyze-message` returns urgent/allow/hold, which is a different question. The demo script works around this by talking to Ollama directly, which is why it bypasses `ai-engine` entirely. **That endpoint is a new contract** — see below. Sketched, with the four mistakes worth avoiding, in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs).
 4. **Workspace rules are browser-side only.** `src/web/src/services/workspaceService.ts` edits an in-memory copy; there is no `/api/workspaces` on the C# side, so nothing you change there reaches the rules the desktop app actually enforces.
 5. **`src/actions` is empty**, so no `ActionCommand` is ever executed.
 6. **No Chrome extension.** Page content cannot be read, so the AI page gatekeeper in §8.1 of the spec does not exist. `src/app` reads the address bar through Windows UI Automation instead, which yields the URL but not what the page says.
 
 ## Shared contracts
 
-[`docs/data-contracts.md`](docs/data-contracts.md) holds the ownership table and serialization rules. `shared/schemas/` has 11 JSON Schema contracts:
+[`docs/data-contracts.md`](docs/data-contracts.md) holds the ownership table and serialization rules. `shared/schemas/` has 13 JSON Schema contracts:
 
 - Core: `InputEvent`, `ExternalMessage`, `ExternalEvent`, `SessionContext`, `AIRequest`, `AIDecision`, `ActionCommand`, `AppState`
 - Task analysis: `TaskTarget`, `TaskAnalyzeRequest`, `TaskDecision`
+- Intent classification (**proposed, not agreed**): `IntentAnalyzeRequest`, `IntentDecision`
 
-`shared/fixtures/` has a worked example of each except `TaskTarget`, which only ever appears embedded in a `TaskAnalyzeRequest`.
+`shared/fixtures/` has a worked example of each except `TaskTarget`, which only ever appears embedded in a `TaskAnalyzeRequest`. Every schema's syntax and every fixture is checked by `src/external/tests/test_shared_contracts.py`, including that a new fixture cannot arrive unlisted.
 
 Agree on a contract change before implementing against it. Chicken `mood` still lacks `thinking` and `ActionCommand` still lacks `BLOCK_PAGE`; both are listed in §11 of the spec.
+
+A fourth is now pending and is **not** in that list: `IntentAnalyzeRequest` / `IntentDecision`, which `ai-engine` needs for auto-reply — `meeting_invite` or `other`, plus the meeting time extracted from the message. The schemas and fixtures are committed and validated so the shape can be reviewed concretely; **nothing implements them yet**. The request must carry `now`, because a model cannot know what day it is and will invent one. Rationale in [`docs/data-contracts.md`](docs/data-contracts.md) under "Intent classification"; the gotchas worth not rediscovering are in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs). §11 of the spec needs a fourth entry.
+
+Related scope note: Slack, Google Calendar and auto-reply are listed **out of scope** in §3 of the spec and as extensions 1–3 in §13. `src/external` implements all three. That was a deliberate step toward the auto mode, but it is a scope change the team has not formally agreed, and the spec has deliberately been left untouched rather than edited unilaterally.
 
 ## Run locally
 
@@ -143,7 +150,7 @@ python CluckInPlugin\tools\mock_receiver.py
 Three independent suites. None needs credentials or network access.
 
 ```powershell
-# Python: src/external, 155 checks
+# Python: src/external, 270 checks
 .\.venv\Scripts\python.exe -m pytest
 
 # C#: desktop context, task API, ViewModel, intervention

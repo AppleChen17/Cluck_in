@@ -68,8 +68,9 @@ class PreviewApp:
         bar = ttk.Frame(root)
         bar.pack(pady=8)
         actions = [
-            ("FOCUS", "START_FOCUS"),
-            ("PAUSE", "PAUSE_FOCUS"),
+            ("FOCUS_START", "FOCUS_START"),
+            ("FOCUS", "FOCUS_DEFAULT"),
+            ("PAUSE", "FOCUS_PAUSE"),
             ("IDLE", "STOP_FOCUS"),
             ("PET", "PET_CHICKEN"),
             ("FEED", "FEED_CHICKEN"),

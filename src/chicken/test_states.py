@@ -6,11 +6,12 @@ from state_machine import ChickenAnim
 def main() -> None:
     anim = ChickenAnim()
     script = [
-        ("START_FOCUS", None),
+        ("FOCUS_START", None),
+        ("FOCUS_DEFAULT", None),
         ("tick", None),
-        ("PAUSE_FOCUS", None),
+        ("FOCUS_PAUSE", None),
         ("tick", None),
-        ("RESUME_FOCUS", None),
+        ("FOCUS_DEFAULT", None),
         ("PET_CHICKEN", None),
         ("tick", None),
         ("SET_MOOD", {"mood": "thinking"}),

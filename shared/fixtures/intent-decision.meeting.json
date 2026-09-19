@@ -1,0 +1,9 @@
+{
+  "messageId": "slack:C08ABCDEF:1789788720.000200",
+  "intent": "meeting_invite",
+  "confidence": 0.92,
+  "reason": "訊息指定了下週二下午三點的會議時間。",
+  "startTime": "2026-09-22T15:00:00+08:00",
+  "endTime": "2026-09-22T16:00:00+08:00",
+  "title": "Cluck In 進度會議"
+}

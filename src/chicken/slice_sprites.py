@@ -11,6 +11,7 @@ SHEET = ROOT / "chicken default.png"
 FREE_SHEET = ROOT / "Free Chicken Sprites.png"
 NEST_SHEET = ROOT / "Egg_And_Nest.png"
 DESK_SHEET = ROOT / "work_station.png"
+MILK_SHEET = ROOT / "Milk and grass item Simple.png"
 FRAMES = ROOT / "frames"
 
 TILE = 16
@@ -18,11 +19,13 @@ SCALE = 2  # 16 -> 32，雞是原本的 1/2，方鍵才畫得下愛心
 CANVAS = (64, 128)  # 畫布不變，角色縮小後上頭才有空間
 
 # (row, col) on the 16x16 grid
+FLY_COLS = (1, 3, 5, 7)  # 飛：17_01 17_03 17_05 17_07，裁切從 17.5 開始
 CLIPS: dict[str, list[tuple[int, int]]] = {
-    "focused": [(17, 1), (17, 3), (17, 5), (17, 7)],  # 17_01 17_03 17_05 17_07，裁切從 17.5 開始
+    "start": [(17, col) for col in FLY_COLS],  # 書桌前、沒牛奶
+    "paused": [(17, col) for col in FLY_COLS],  # 書桌前、有牛奶
+    "focused": [(7, 0), (7, 1), (7, 2), (7, 3), (7, 4)],  # 07_0 … 07_4 在巢裡
     "feed": [(12, 0), (12, 1)],  # 用眼睛數第 13 排 = 程式列 12（從 0 起算）
     "pet": [(8, 0), (8, 1), (8, 2), (8, 3)],  # 08_0 壓下、08_2 壓住、08_3+08_0 彈回
-    "paused": [(7, 0), (7, 1), (7, 2), (7, 3), (7, 4)],  # 07_0 … 07_4 待在巢裡
     "tired": [(3, 4), (3, 5)],  # schema 保留，MVP 不用
 }
 
@@ -46,25 +49,59 @@ def _bottom(tile: Image.Image) -> Image.Image:
     return canvas
 
 
-def _desk() -> Image.Image:
+def _desk(*, flip: bool = False) -> Image.Image:
     desk = Image.open(DESK_SHEET).convert("RGBA")
-    desk = desk.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    if flip:
+        desk = desk.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     side = int(TILE * SCALE * 1.5)
     return desk.resize((side, side), Image.Resampling.NEAREST)
 
 
+def _desk_xy(*, flip: bool = False) -> tuple[Image.Image, int, int]:
+    desk = _desk(flip=flip)
+    dx = (CANVAS[0] - desk.width) // 2
+    dy = CANVAS[1] - desk.height - 8
+    return desk, dx, dy
+
+
+def _milk() -> Image.Image:
+    """0_02 那瓶牛奶（列 0、第 3 格）。"""
+    sheet = Image.open(MILK_SHEET).convert("RGBA")
+    return sheet.crop((TILE * 2, 0, TILE * 3, TILE))
+
+
+def _paste_milk(canvas: Image.Image, desk: Image.Image, dx: int, dy: int) -> None:
+    if not MILK_SHEET.exists():
+        return
+    milk = _milk()
+    canvas.paste(
+        milk,
+        (dx + desk.width - milk.width - 2, dy + 36 - milk.height),
+        milk,
+    )
+
+
 def _empty_desk() -> Image.Image:
     canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
-    desk = _desk()
-    canvas.paste(desk, ((CANVAS[0] - desk.width) // 2, CANVAS[1] - desk.height - 8), desk)
+    desk, dx, dy = _desk_xy()
+    canvas.paste(desk, (dx, dy), desk)
     return canvas
 
 
 def _with_desk(placed: Image.Image) -> Image.Image:
     canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
-    desk = _desk()
-    canvas.paste(desk, ((CANVAS[0] - desk.width) // 2, CANVAS[1] - desk.height - 8), desk)
+    desk, dx, dy = _desk_xy()
+    canvas.paste(desk, (dx, dy), desk)
     canvas.paste(placed, (0, 0), placed)
+    return canvas
+
+
+def _with_desk_milk(placed: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
+    desk, dx, dy = _desk_xy()
+    canvas.paste(desk, (dx, dy), desk)
+    canvas.paste(placed, (0, 0), placed)
+    _paste_milk(canvas, desk, dx, dy)
     return canvas
 
 
@@ -88,14 +125,11 @@ def _in_nest(tile: Image.Image) -> Image.Image:
     return canvas
 
 
-def _fly_chick(sheet: Image.Image, col: int) -> Image.Image:
-    """飛的格子從 17.5 起剪 16x16，不放大；FOCUS 加上辦公桌。"""
+def _fly_placed(sheet: Image.Image, col: int) -> Image.Image:
+    """飛的格子從 17.5 起剪 16x16，不放大。"""
     y0 = int(17.5 * TILE)
     box = (col * TILE, y0, (col + 1) * TILE, y0 + TILE)
-    placed = _bottom(_scale(sheet.crop(box)))
-    if DESK_SHEET.exists():
-        return _with_desk(placed)
-    return placed
+    return _bottom(_scale(sheet.crop(box)))
 
 
 def _heart_chick(sheet: Image.Image, col: int) -> Image.Image:
@@ -184,10 +218,26 @@ def slice_sheet(sheet_path: Path = SHEET, out_dir: Path = FRAMES) -> list[Path]:
         written.append(path)
 
     for mood, cells in CLIPS.items():
-        if mood == "focused":
-            for i, (_row, col) in enumerate(cells):
+        if mood in {"start", "paused"}:
+            compose = _with_desk_milk if mood == "paused" else _with_desk
+            for i, col in enumerate(FLY_COLS):
                 path = out_dir / f"{mood}_{i:02d}.png"
-                _fly_chick(sheet, col).save(path)
+                placed = _fly_placed(sheet, col)
+                if DESK_SHEET.exists():
+                    placed = compose(placed)
+                placed.save(path)
+                written.append(path)
+            continue
+        if mood == "focused":
+            for i, (row, col) in enumerate(cells):
+                box = (col * TILE, row * TILE, (col + 1) * TILE, (row + 1) * TILE)
+                path = out_dir / f"{mood}_{i:02d}.png"
+                placed = _scale(sheet.crop(box))
+                if NEST_SHEET.exists():
+                    placed = _in_nest(placed)
+                else:
+                    placed = _bottom(placed)
+                placed.save(path)
                 written.append(path)
             continue
         tiles = []
@@ -203,12 +253,9 @@ def slice_sheet(sheet_path: Path = SHEET, out_dir: Path = FRAMES) -> list[Path]:
             cycle.extend(hearts * 2)
         for i, tile in enumerate(cycle):
             path = out_dir / f"{mood}_{i:02d}.png"
-            if mood == "paused" and NEST_SHEET.exists():
-                placed = _in_nest(tile)
-            else:
-                placed = _bottom(tile)
-                if mood == "pet" and DESK_SHEET.exists():
-                    placed = _with_desk(placed)
+            placed = _bottom(tile)
+            if mood == "pet" and DESK_SHEET.exists():
+                placed = _with_desk(placed)
             placed.save(path)
             written.append(path)
 
