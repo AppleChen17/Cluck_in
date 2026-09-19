@@ -46,7 +46,7 @@ static class WpfLaunchChecks
                         throw new Exception("Live blocked-title refresh failed.");
                     probe.Title = "Unclassified activity";
                     await Task.Delay(1600);
-                    if (vm.FocusStatus != "Neutral") throw new Exception("Live neutral refresh failed.");
+                    if (vm.FocusStatus != "Distracted") throw new Exception("Live unlisted activity refresh failed.");
 
                     var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
                     bitmap.Render(window);

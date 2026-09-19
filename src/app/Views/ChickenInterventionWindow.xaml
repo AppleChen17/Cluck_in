@@ -1,0 +1,21 @@
+<Window x:Class="CluckIn.App.Views.ChickenInterventionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Chicken Intervention" Width="400" SizeToContent="Height"
+        Topmost="True" ShowActivated="False" ShowInTaskbar="False"
+        WindowStyle="None" ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Background="#FFF7DD" FontFamily="Segoe UI">
+    <Border BorderBrush="#D6A64A" BorderThickness="2" Padding="24">
+        <StackPanel>
+            <TextBlock Text="🐔 Back to your task?" FontSize="25" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Intervention.Reason}" TextWrapping="Wrap" Margin="0,14,0,8" />
+            <TextBlock Text="{Binding Intervention.CurrentApp}" FontWeight="Bold" />
+            <TextBlock Text="{Binding Intervention.CurrentDomain}" TextWrapping="Wrap" />
+            <Button Content="Back to Work" Command="{Binding ReturnToWorkCommand}" Margin="0,16,0,6" />
+            <Button Content="Allow Temporarily · 5 min" Command="{Binding TemporaryAllowCommand}" />
+            <TextBlock Text="Open an allowed app to return to work if no work window is available."
+                       TextWrapping="Wrap" FontSize="12" Margin="0,12,0,0" />
+            <TextBlock Text="{Binding InterventionErrorMessage}" TextWrapping="Wrap" Foreground="#A74632" Margin="0,8,0,0" />
+        </StackPanel>
+    </Border>
+</Window>

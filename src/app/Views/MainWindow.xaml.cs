@@ -9,6 +9,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private ChickenInterventionWindow? _chicken;
     private bool _closing;
     private bool _shutdownComplete;
 
@@ -16,9 +17,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _viewModel = viewModel;
+        _viewModel.PropertyChanged += UpdateChicken;
         _refreshTimer.Tick += RefreshTick;
         Loaded += OnLoaded;
         Closing += OnClosing;
+    }
+
+    private void UpdateChicken(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_closing || !_viewModel.Intervention.IsActive)
+        {
+            _chicken?.Close();
+            _chicken = null;
+        }
+        else if (_chicken is null)
+        {
+            _chicken = new ChickenInterventionWindow { DataContext = _viewModel };
+            _chicken.Closed += (_, _) => _chicken = null;
+            _chicken.Show();
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -35,6 +52,9 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (_closing) return;
         _closing = true;
+        _viewModel.PropertyChanged -= UpdateChicken;
+        _chicken?.Close();
+        _chicken = null;
         _refreshTimer.Stop();
         _refreshTimer.Tick -= RefreshTick;
         try { await _viewModel.ShutdownAsync(); }

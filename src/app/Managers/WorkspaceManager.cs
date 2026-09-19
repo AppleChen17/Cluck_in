@@ -15,7 +15,8 @@ public sealed class WorkspaceManager : IWorkspaceManager
             Id = "coding",
             Name = "Coding",
             AllowedApplications = ["code", "devenv", "WindowsTerminal"],
-            AllowedWindowKeywords = ["GitHub", "Stack Overflow", "Documentation"],
+            AllowedDomains = ["localhost", "github.com", "stackoverflow.com", "chatgpt.com", "learn.microsoft.com", "developer.mozilla.org"],
+            AllowedWindowKeywords = ["GitHub", "Stack Overflow", "Documentation", "ChatGPT"],
             BlockedWindowKeywords = ["YouTube", "Instagram", "Netflix"]
         });
     }
@@ -45,6 +46,7 @@ public sealed class WorkspaceManager : IWorkspaceManager
         _workspaces.Add(workspace with
         {
             AllowedApplications = Array.AsReadOnly(workspace.AllowedApplications.ToArray()),
+            AllowedDomains = Array.AsReadOnly(workspace.AllowedDomains.ToArray()),
             AllowedWindowKeywords = Array.AsReadOnly(workspace.AllowedWindowKeywords.ToArray()),
             BlockedApplications = Array.AsReadOnly(workspace.BlockedApplications.ToArray()),
             BlockedWindowKeywords = Array.AsReadOnly(workspace.BlockedWindowKeywords.ToArray())

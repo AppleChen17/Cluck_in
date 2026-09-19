@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import WorkspaceRules from './components/WorkspaceRules';
+import TaskLauncher from './components/TaskLauncher';
+import ChickenIntervention from './components/ChickenIntervention';
 import './workspace-rules.css';
 
 export default function App() {
@@ -12,6 +14,7 @@ export default function App() {
   const editingRules = route === '#/workspace-rules';
   return (
     <>
+      <ChickenIntervention />
       <nav className="app-nav" aria-label="Main navigation">
         <a href="#/dashboard" aria-current={!editingRules ? 'page' : undefined}>Dashboard</a>
         <a href="#/workspace-rules" aria-current={editingRules ? 'page' : undefined}>Workspace Rules</a>
@@ -44,6 +47,7 @@ const demo = {
 };
 
 function Dashboard() {
+  const [currentTask, setCurrentTask] = useState(demo.task);
   return (
     <main className="dashboard">
       <header className="page-header">
@@ -63,6 +67,7 @@ function Dashboard() {
       <p className="intro">A little less distraction. A little more focus.</p>
 
       <div className="dashboard-grid">
+        <TaskLauncher onStarted={setCurrentTask} />
         <section className="card session" aria-labelledby="session-heading">
           <div className="card-heading">
             <h2 id="session-heading">Session</h2>
@@ -77,7 +82,7 @@ function Dashboard() {
             ))}
           </ul>
           <p className="label">Current Task</p>
-          <p className="task">{demo.task}</p>
+          <p className="task">{currentTask}</p>
           <div className="timer-block">
             <p className="label">Focus Timer</p>
             <p className="timer" aria-label="24 minutes and 32 seconds remaining">{demo.timer}</p>
@@ -137,7 +142,7 @@ function Dashboard() {
           </ol>
         </section>
       </div>
-      <footer>Hackathon preview · Static session, timer, and AI results · No backend connection</footer>
+      <footer>Task buttons connect to Desktop Agent · Timer and AI results are demo data</footer>
     </main>
   );
 }

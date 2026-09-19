@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+
 from schemas import (
-    AnalyzeMessageRequest,
-    AnalyzeMessageResponse,
-    DraftReplyRequest,
-    DraftReplyResponse,
+    AIRequest,
+    AIDecision,
+    TaskAnalyzeRequest,
+    TaskDecision,
 )
 
 
@@ -12,13 +13,13 @@ class LLMProvider(ABC):
     @abstractmethod
     def analyze_message(
         self,
-        request: AnalyzeMessageRequest
-    ) -> AnalyzeMessageResponse:
+        request: AIRequest
+    ) -> AIDecision:
         pass
 
     @abstractmethod
-    def draft_reply(
+    def analyze_task(
         self,
-        request: DraftReplyRequest
-    ) -> DraftReplyResponse:
+        request: TaskAnalyzeRequest
+    ) -> TaskDecision:
         pass

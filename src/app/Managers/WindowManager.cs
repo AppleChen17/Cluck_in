@@ -35,6 +35,7 @@ public sealed class WindowManager : IWindowManager
 
             var info = new ActiveWindowInfo
             {
+                WindowHandle = window.ToInt64(),
                 ProcessId = (int)processId,
                 WindowTitle = title.ToString()
             };

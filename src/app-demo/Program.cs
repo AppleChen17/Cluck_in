@@ -6,7 +6,7 @@ using CluckIn.App.Services;
 var workspaces = new WorkspaceManager();
 var timer = new TimerManager();
 var context = new ContextManager(new WindowManager(), new BrowserManager(), workspaces, timer);
-var agent = new DesktopAgentService(context, workspaces, new FocusManager(), timer);
+var agent = new DesktopAgentService(context, workspaces, new FocusManager(timer), timer);
 var json = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

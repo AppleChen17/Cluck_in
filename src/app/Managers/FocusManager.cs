@@ -3,47 +3,28 @@ using CluckIn.App.Models;
 
 namespace CluckIn.App.Managers;
 
-public sealed class FocusManager : IFocusManager
+public sealed class FocusManager(
+    ITimerManager? timerManager = null,
+    IWhitelistManager? whitelistManager = null,
+    IInterventionManager? interventionManager = null) : IFocusManager
 {
-    public FocusEvaluation Evaluate(DesktopContext context, WorkspaceProfile workspace)
+    private readonly ITimerManager _timer = timerManager ?? new TimerManager();
+    private readonly IWhitelistManager _whitelist = whitelistManager ?? new WhitelistManager();
+    public void StartFocus(TimeSpan duration)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(workspace);
-        var window = context.ActiveWindow;
-        var process = NormalizeApplication(window.ProcessName);
-
-        var match = workspace.BlockedApplications.FirstOrDefault(a =>
-            !string.IsNullOrWhiteSpace(a) && NormalizeApplication(a) == process);
-        if (match is not null)
-            return Result(false, $"Application is blocked: {match}", match);
-
-        match = MatchKeyword(workspace.BlockedWindowKeywords, window.WindowTitle);
-        if (match is not null)
-            return Result(false, $"Window matches blocked keyword: {match}", match);
-
-        match = workspace.AllowedApplications.FirstOrDefault(a =>
-            !string.IsNullOrWhiteSpace(a) && NormalizeApplication(a) == process);
-        if (match is not null)
-            return Result(true, $"Application is allowed: {match}");
-
-        match = MatchKeyword(workspace.AllowedWindowKeywords, window.WindowTitle);
-        if (match is not null)
-            return Result(true, $"Window matches allowed keyword: {match}");
-
-        return new() { Reason = "No workspace rule matched the current activity." };
+        _timer.Start(duration);
+        interventionManager?.Reset();
+    }
+    public void StopFocus()
+    {
+        _timer.Stop();
+        interventionManager?.Reset();
     }
 
-    private static string NormalizeApplication(string value)
-    {
-        value = value.Trim();
-        return (value.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? value[..^4] : value)
-            .ToLowerInvariant();
-    }
+    public FocusEvaluation Evaluate(DesktopContext context, WorkspaceProfile workspace) =>
+        _whitelist.Evaluate(context, workspace);
 
-    private static string? MatchKeyword(IEnumerable<string> keywords, string title) =>
-        keywords.FirstOrDefault(k => !string.IsNullOrWhiteSpace(k) &&
-            title.Contains(k, StringComparison.OrdinalIgnoreCase));
-
-    private static FocusEvaluation Result(bool focused, string reason, string? distraction = null) =>
-        new() { IsEvaluated = true, IsFocused = focused, Reason = reason, DetectedDistraction = distraction };
+    public void UpdateIntervention(DesktopContext context, FocusEvaluation evaluation) =>
+        interventionManager?.Observe(context, evaluation,
+            context.FocusModeEnabled && context.TimerRunning && evaluation.IsEvaluated && !evaluation.IsFocused);
 }

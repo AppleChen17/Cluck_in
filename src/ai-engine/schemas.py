@@ -1,31 +1,91 @@
-from typing import Literal
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
 
 
-class AnalyzeMessageRequest(BaseModel):
-    current_task: str
-    source: Literal["gmail", "slack", "other"]
-    sender: str
+class ExternalMessage(BaseModel):
+    id: str = Field(min_length=1)
+    source: Literal["gmail", "slack"]
+    sender: str = Field(min_length=1)
+
+    title: Optional[str] = None
     content: str
 
+    timestamp: datetime
+    unread: bool
 
-class AnalyzeMessageResponse(BaseModel):
-    priority: Literal["low", "medium", "high"]
-    relevant: bool
-    should_interrupt: bool
-    summary: str
-    suggested_action: Literal[
-        "ignore",
-        "notify",
-        "draft_reply",
-        "reply_immediately"
+    metadata: dict | None = None
+
+
+class SessionContext(BaseModel):
+    mode: Literal["idle", "focus", "auto"]
+    currentTask: Optional[str]
+
+    focusStartedAt: Optional[datetime] = None
+    focusDurationSeconds: int | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    allowedApps: list[str] | None = None
+    blockedApps: list[str] | None = None
+
+    metadata: dict | None = None
+
+
+class AIRequest(BaseModel):
+    message: ExternalMessage
+    context: SessionContext
+    metadata: dict | None = None
+
+
+class AIDecision(BaseModel):
+    messageId: str = Field(min_length=1)
+
+    decision: Literal[
+        "urgent",
+        "allow",
+        "hold",
     ]
 
+    relevance: float = Field(
+        ge=0,
+        le=1,
+    )
 
-class DraftReplyRequest(BaseModel):
-    content: str
-    context: str | None = None
+    urgency: float = Field(
+        ge=0,
+        le=1,
+    )
+
+    reason: str = Field(min_length=1)
+
+    metadata: dict | None = None
+
+class TaskTarget(BaseModel):
+    type: Literal["app", "web"]
+    name: str
+    title: str | None = None
+    url: str | None = None
+    identifier: str | None = None
 
 
-class DraftReplyResponse(BaseModel):
-    reply: str
+class TaskAnalyzeRequest(BaseModel):
+    target: TaskTarget
+    context: SessionContext
+
+
+class TaskDecision(BaseModel):
+    decision: Literal[
+        "allow",
+        "warn",
+        "block",
+    ]
+
+    relevance: float = Field(
+        ge=0,
+        le=1,
+    )
+
+    reason: str = Field(min_length=1)
