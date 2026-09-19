@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Microsoft.Extensions.Options;
 using CluckIn.App.Managers;
 using CluckIn.App.Models;
@@ -5,6 +6,9 @@ using CluckIn.App.Interfaces;
 using CluckIn.App.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
+using CluckIn.App.Orchestration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace CluckIn.App.Services;
 
@@ -50,13 +54,34 @@ public static class DesktopAgentFactory
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }).RemoveAllLoggers();
         services.AddSingleton<ITaskAnalysisClient, TaskAnalysisClient>();
-        services.AddOptions<ExternalMessagesOptions>();
+        services.AddHttpClient("FocusAI", (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<AiEngineOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        }).RemoveAllLoggers();
         services.AddHttpClient("ExternalMessages", (provider, client) =>
         {
-            client.BaseAddress = new Uri(provider.GetRequiredService<IOptions<ExternalMessagesOptions>>().Value.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(5);
+            var configuration = provider.GetService<IConfiguration>();
+            client.BaseAddress = new Uri((configuration?["External:BaseUrl"] ?? "http://127.0.0.1:8100").TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(35);
         }).RemoveAllLoggers();
-        services.AddSingleton<UrgentMessageService>();
+        services.AddSingleton<IFocusAIEngine>(provider => new FocusAIClient(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient("FocusAI"),
+            () => provider.GetRequiredService<ISessionManager>().CurrentTask?.Description));
+        services.AddSingleton<IMessageListener>(provider => new ExternalMessageListener(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExternalMessages"),
+            text => provider.GetRequiredService<ILogger<ExternalMessageListener>>().LogWarning("{Detail}", text)));
+        services.AddSingleton<IExternalReplyService>(provider => new ExternalReplyClient(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient("ExternalMessages"),
+            text => provider.GetRequiredService<ILogger<ExternalReplyClient>>().LogInformation("{Detail}", text)));
+        services.AddSingleton<IUserNotificationService, DesktopNotificationService>();
+        services.AddSingleton<IFocusMessageStore, InMemoryFocusMessageStore>();
+        services.AddSingleton<MainProgramCoordinator>(provider => new(
+            provider.GetRequiredService<IFocusAIEngine>(), provider.GetRequiredService<IMessageListener>(),
+            provider.GetRequiredService<IExternalReplyService>(), provider.GetRequiredService<IUserNotificationService>(),
+            provider.GetRequiredService<IFocusMessageStore>(),
+            log: text => provider.GetRequiredService<ILogger<MainProgramCoordinator>>().LogInformation("{Detail}", text)));
         services.AddSingleton<DesktopAgentService>();
         services.AddSingleton<ITaskRepository>(_ =>
         {

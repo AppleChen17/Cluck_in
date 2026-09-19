@@ -81,7 +81,14 @@ static class TaskChecks
             {
                 try
                 {
-                    await using var app = TaskApiHost.Create(dispatcher);
+                    var mainAI = new MainAI();
+                    var listener = new MainListener();
+                    var notifications = new MainNotifications();
+                    await using var app = TaskApiHost.Create(dispatcher, services => {
+                        services.AddSingleton<IFocusAIEngine>(mainAI);
+                        services.AddSingleton<IMessageListener>(listener);
+                        services.AddSingleton<IUserNotificationService>(notifications);
+                    });
                     app.Urls.Clear();
                     app.Urls.Add("http://127.0.0.1:0");
                     await app.StartAsync();
@@ -122,6 +129,7 @@ static class TaskChecks
                         var afterEnd = await client.GetFromJsonAsync<SessionResponse>("/api/session");
                         if (afterEnd?.CurrentTask is not null || afterEnd?.FocusSession.Status != FocusSessionStatus.Stopped)
                             throw new Exception("End Task API must clear task and stop focus");
+                        await CheckMainProgramApiAsync(client, agent, mainAI, listener, notifications);
                         client.DefaultRequestHeaders.Add("Origin", "https://untrusted.example");
                         var origin = await client.PostAsJsonAsync("/api/tasks/api-test/start", new { });
                         if (origin.StatusCode != HttpStatusCode.Forbidden) throw new Exception("Untrusted origin accepted");
@@ -138,6 +146,76 @@ static class TaskChecks
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         return completion.Task;
+    }
+
+    private static async Task CheckMainProgramApiAsync(HttpClient client, DesktopAgentService agent,
+        MainAI ai, MainListener listener, MainNotifications notifications)
+    {
+        async Task Input(string type, object payload, int key) {
+            using var result = await client.PostAsJsonAsync("/input-event",
+                new { type, source = "logitech", timestamp = DateTimeOffset.UtcNow, payload, metadata = new { keyId = key } });
+            result.EnsureSuccessStatusCode();
+        }
+        agent.SetActiveWorkspace("coding");
+        await Input("CHANGE_MODE", new { mode = "focus" }, 1);
+        await Input("CHANGE_MODE", new { mode = "focus" }, 1);
+        if(ai.Starts != 1 || listener.Starts != 1 || (await agent.GetContextAsync()).TimerRunning)
+            throw new Exception("Focus mode must start orchestration once without starting the timer");
+        await Input("SET_AI_ASSIST_MODE", new { mode = "suggestion" }, 3);
+        if(agent.MainProgram!.CurrentAIAssistMode != AIAssistRoutingMode.Suggestion)
+            throw new Exception("AI routing mode not wired");
+        using var pat = await client.PostAsJsonAsync("/api/main/pat", new { });
+        pat.EnsureSuccessStatusCode();
+        if(notifications.Summaries != 1) throw new Exception("PAT endpoint not wired");
+        await Input("START_FOCUS", new { focusDurationSeconds = 60 }, 5);
+        if(!(await agent.GetContextAsync()).TimerRunning || ai.Starts != 1) throw new Exception("START_FOCUS lifecycle regressed");
+        await Input("PAUSE_FOCUS", new { }, 5);
+        if((await agent.GetContextAsync()).FocusSession.Status != FocusSessionStatus.Paused) throw new Exception("Pause not wired");
+        await Input("RESUME_FOCUS", new { }, 5);
+        if(!(await agent.GetContextAsync()).TimerRunning) throw new Exception("Resume not wired");
+        await Input("STOP_FOCUS", new { }, 6);
+        if((await agent.GetContextAsync()).TimerRunning || !agent.MainProgram.FocusSessionActive)
+            throw new Exception("STOP_FOCUS must stop only timer");
+        await Input("CHANGE_MODE", new { mode = "idle" }, 1);
+        await Input("CHANGE_MODE", new { mode = "idle" }, 1);
+        if(ai.Stops != 1 || listener.Stops != 1 || agent.MainProgram.FocusSessionActive)
+            throw new Exception("Idle cleanup not idempotent");
+        await Input("START_FOCUS", new { focusDurationSeconds = 60 }, 5);
+        if(ai.Starts != 1) throw new Exception("Timer start incorrectly enters Main Focus lifecycle");
+        await Input("CHANGE_MODE", new { mode = "focus" }, 1);
+        await agent.ShutdownAsync();
+        await agent.ShutdownAsync();
+        if(ai.Stops != 2 || listener.Stops != 2 || agent.MainProgram.FocusSessionActive ||
+            (await agent.GetContextAsync()).TimerRunning) throw new Exception("Desktop shutdown cleanup failed");
+        Console.WriteLine("Passed 10 Main Program API wiring checks.");
+    }
+
+    private sealed class MainAI : IFocusAIEngine
+    {
+        public int Starts, Stops;
+        public Task StartAsync(string id, CancellationToken token) { Starts++; return Task.CompletedTask; }
+        public Task StopAsync(CancellationToken token) { Stops++; return Task.CompletedTask; }
+        public Task<AIDecisionContract> AnalyzeMessageAsync(ExternalMessageContract message, string id, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task<string?> DraftReplyAsync(ExternalMessageContract message, AIDecisionContract decision, string id, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task<string> SummarizeAsync(IReadOnlyList<FocusMessageRecord> messages, string id, CancellationToken token) =>
+            throw new NotSupportedException();
+    }
+    private sealed class MainListener : IMessageListener
+    {
+        public int Starts, Stops;
+        public event Func<ExternalMessageContract, Task>? MessageReceived { add { } remove { } }
+        public Task StartAsync(CancellationToken token) { Starts++; return Task.CompletedTask; }
+        public Task StopAsync(CancellationToken token) { Stops++; return Task.CompletedTask; }
+    }
+    private sealed class MainNotifications : IUserNotificationService
+    {
+        public int Summaries;
+        public Task ShowUrgentMessageAsync(ExternalMessageContract message, CancellationToken token) => throw new NotSupportedException();
+        public Task ShowUrgentMessageWithSuggestionAsync(ExternalMessageContract message, string suggestion, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task ShowSummaryAsync(string summary, bool isEmpty, CancellationToken token) { Summaries++; return Task.CompletedTask; }
     }
 
     private sealed record SessionResponse(TaskProfile? CurrentTask, FocusSession FocusSession);

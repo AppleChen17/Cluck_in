@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 
 public static class IntegrationClient{
     private const string DefaultUrl =
-        "http://127.0.0.1:8765/input-event";
+        "http://127.0.0.1:5180/input-event";
 
     private static readonly HttpClient Client = new HttpClient{
-        Timeout = TimeSpan.FromSeconds(2)
+        Timeout = TimeSpan.FromSeconds(45)
     };
 
     private static readonly JsonSerializerOptions JsonOptions =

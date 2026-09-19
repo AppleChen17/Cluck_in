@@ -332,8 +332,10 @@ public static class MainController{
                 CluckInAction.ViewMessages
             );
 
-            PluginLog.Info(
-                "SHOW_MESSAGES integration pending shared contract"
+            SendInputEvent(
+                "SHOW_MESSAGES",
+                new Dictionary<String, Object>(),
+                2
             );
 
             return;
@@ -420,7 +422,16 @@ public static class MainController{
     }
 
     private static void HandleKey4(){
-        PluginLog.Info("Task selection opened");
+        RequestAction(
+            4,
+            CluckInAction.SelectTask
+        );
+
+        SendInputEvent(
+            "SELECT_TASK",
+            new Dictionary<String, Object>(),
+            4
+        );
     }
 
     private static void HandleFocusControlKey(){

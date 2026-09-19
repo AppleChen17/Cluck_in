@@ -13,7 +13,7 @@ namespace CluckIn.App.Services;
 
 public static class TaskApiHost
 {
-    public static WebApplication Create(Dispatcher dispatcher)
+    public static WebApplication Create(Dispatcher dispatcher, Action<IServiceCollection>? configureServices = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
         builder.WebHost.UseUrls("http://127.0.0.1:5180");
@@ -27,6 +27,7 @@ public static class TaskApiHost
         builder.Services.Configure<AiEngineOptions>(builder.Configuration.GetSection("AiEngine"));
         builder.Services.Configure<ExternalMessagesOptions>(builder.Configuration.GetSection("ExternalMessages"));
         DesktopAgentFactory.RegisterServices(builder.Services);
+        configureServices?.Invoke(builder.Services);
         var app = builder.Build();
 
         // A web page must not be able to launch local programs through a blind form POST.
@@ -69,6 +70,18 @@ public static class TaskApiHost
                     error = context.Response.StatusCode == 500 ? "Task operation failed. See Desktop Agent logs." : exception.Message
                 });
             }
+        });
+
+        app.MapPost("/input-event", async (MainInputEvent input, DesktopAgentService agent) =>
+            await (await dispatcher.InvokeAsync(async () =>
+            {
+                await agent.HandleInputEventAsync(input);
+                return Results.Ok(new { success = true });
+            })));
+        app.MapPost("/api/main/pat", async (DesktopAgentService agent) =>
+        {
+            await agent.HandlePatAsync();
+            return Results.Ok(new { success = true });
         });
 
         app.MapGet("/api/tasks", (ITaskRepository repository) => repository.GetTasksAsync());

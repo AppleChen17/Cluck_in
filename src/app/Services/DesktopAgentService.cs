@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text.Json;
+using CluckIn.App.Orchestration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using CluckIn.App.Interfaces;
@@ -20,21 +22,77 @@ public sealed class DesktopAgentService(
     IOptions<AiEngineOptions>? aiOptions = null,
     ILogger<DesktopAgentService>? logger = null,
     TimeProvider? timeProvider = null,
-    UrgentMessageService? urgentMessages = null)
+    MainProgramCoordinator? mainProgram = null)
 {
-    private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
-    public UrgentMessageService? UrgentMessages => urgentMessages;
-    public Task PollUrgentMessagesAsync(CancellationToken cancellationToken)
+    public MainProgramCoordinator? MainProgram => mainProgram;
+
+    public async Task ChangeModeAsync(string mode, CancellationToken cancellationToken = default)
     {
-        var session = timerManager.GetCurrentSession();
-        return urgentMessages?.PollAsync(new
+        if (mainProgram is null) throw new InvalidOperationException("Main Program is unavailable.");
+        switch (mode)
         {
-            mode = session.Status == FocusSessionStatus.Running ? "focus" : "idle",
-            currentTask = CurrentTask?.Description ?? workspaceManager.GetActiveWorkspace()?.Name,
-            focusStartedAt = session.StartTime,
-            focusDurationSeconds = session.Duration.TotalSeconds
-        }, cancellationToken) ?? Task.CompletedTask;
+            case "focus": await mainProgram.EnterFocusAsync(cancellationToken); break;
+            case "idle":
+                StopFocus();
+                await mainProgram.LeaveFocusAsync(cancellationToken);
+                break;
+            default: throw new ArgumentException("Mode must be focus or idle.");
+        }
     }
+
+    public void SetAIAssistMode(string mode) =>
+        (mainProgram ?? throw new InvalidOperationException("Main Program is unavailable.")).SetAIAssistMode(mode);
+
+    public Task HandlePatAsync(CancellationToken cancellationToken = default) =>
+        (mainProgram ?? throw new InvalidOperationException("Main Program is unavailable.")).HandlePatAsync(cancellationToken);
+
+    public async Task ShutdownAsync()
+    {
+        StopFocus();
+        if (mainProgram is not null) await mainProgram.ShutdownAsync().ConfigureAwait(false);
+    }
+
+    public async Task HandleInputEventAsync(MainInputEvent input, CancellationToken cancellationToken = default)
+    {
+        if (input.Source != "logitech") throw new ArgumentException("Unsupported input source.");
+        switch (input.Type)
+        {
+            case "CHANGE_MODE":
+                await ChangeModeAsync(input.Payload.GetProperty("mode").GetString()!, cancellationToken);
+                break;
+            case "SET_AI_ASSIST_MODE":
+                SetAIAssistMode(input.Payload.GetProperty("mode").GetString()!);
+                break;
+            case "START_FOCUS":
+                var seconds = input.Payload.GetProperty("focusDurationSeconds").GetInt32();
+                if (seconds is < 1 or > 86399) throw new ArgumentException("Invalid focus duration.");
+                StartFocus(TimeSpan.FromSeconds(seconds));
+                break;
+            case "PAUSE_FOCUS": PauseFocus(); break;
+            case "RESUME_FOCUS": ResumeFocus(); break;
+            case "STOP_FOCUS": StopFocus(); break;
+            case "SELECT_TASK":
+                OpenTaskSelection();
+                break;
+            case "SHOW_MESSAGES":
+                await HandlePatAsync();
+                break;
+            default: throw new ArgumentException($"Unsupported Main Program input: {input.Type}");
+        }
+    }
+
+    private static void OpenTaskSelection(){
+        var baseUrl = Environment.GetEnvironmentVariable("CLUCKIN_WEB_URL");
+        if(String.IsNullOrWhiteSpace(baseUrl)){
+            baseUrl = "http://127.0.0.1:5173";
+        }
+        var url = baseUrl.TrimEnd('/') + "/#/dashboard";
+        Process.Start(new ProcessStartInfo(url){
+            UseShellExecute = true
+        });
+    }
+
+    private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
     private readonly AiEngineOptions _options = aiOptions?.Value ?? new();
     private string? _analysisKey;
     private Task<TaskDecision?>? _analysis;
