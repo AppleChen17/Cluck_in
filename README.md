@@ -64,8 +64,8 @@ Everything is localhost HTTP with JSON. No two modules share a process.
 The modules work. The seams between them mostly do not. In rough priority order:
 
 1. **Logitech to app.** The plugin posts `InputEvent` to `127.0.0.1:8765/input-event`. Nothing in `src/app` listens there — its API is on `:5180` with different routes. The flow has been verified only against `CluckInPlugin/tools/mock_receiver.py`.
-2. **Gmail and Slack to app.** `src/external` serves contract-valid messages on `:8100`, but no C# client polls it. It also now accepts replies on `POST /reply` and serves `/calendar/*`, and nothing calls those either — `src/external/scripts/auto_reply_demo.py` drives the whole loop standalone in the meantime.
-3. **AI to app.** `src/ai-engine` serves `/analyze-message` and `/analyze-task`, but nothing calls either.
+2. **Gmail and Slack to app, in both directions.** `src/external` serves messages on `:8100`, accepts replies on `POST /reply`, reactions on `POST /react`, and reads and writes Google Calendar on `/calendar/*`. **No C# client calls any of it.** What is missing is the decision, which is `src/app`'s by design: poll `/messages`, decide whether a message deserves an answer *given the current focus session and task*, and post that answer back. `src/external/scripts/auto_reply_demo.py` runs that loop standalone today — read it for the shape of the calls, not as a model of the logic, because it decides with no session context at all and answers anything that looks like a meeting.
+3. **AI to app — and one endpoint nobody has written yet.** `src/ai-engine` serves `/analyze-message` and `/analyze-task`; nothing calls either. Auto-reply needs a third thing neither can answer: *is this person asking when I am free, telling me a meeting time, or neither?* `/analyze-message` returns urgent/allow/hold, which is a different question. The demo script works around this by talking to Ollama directly, which is why it bypasses `ai-engine` entirely. **That endpoint is a new contract** — see below. Sketched, with the four mistakes worth avoiding, in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs).
 4. **Workspace rules are browser-side only.** `src/web/src/services/workspaceService.ts` edits an in-memory copy; there is no `/api/workspaces` on the C# side, so nothing you change there reaches the rules the desktop app actually enforces.
 5. **`src/actions` is empty**, so no `ActionCommand` is ever executed.
 6. **No Chrome extension.** Page content cannot be read, so the AI page gatekeeper in §8.1 of the spec does not exist. `src/app` reads the address bar through Windows UI Automation instead, which yields the URL but not what the page says.
@@ -80,6 +80,10 @@ The modules work. The seams between them mostly do not. In rough priority order:
 `shared/fixtures/` has a worked example of each except `TaskTarget`, which only ever appears embedded in a `TaskAnalyzeRequest`.
 
 Agree on a contract change before implementing against it. Chicken `mood` still lacks `thinking` and `ActionCommand` still lacks `BLOCK_PAGE`; both are listed in §11 of the spec.
+
+A third is now pending and is **not** in that list: `ai-engine` needs an intent-classification pair for auto-reply (`asking_availability` / `meeting_invite` / `other`, plus the extracted meeting time), and its request must carry `now` — a model cannot know what day it is and will invent one. Sketched in [`src/external/README.md`](src/external/README.md#what-ai-engine-still-needs). §11 needs a fourth entry.
+
+Related scope note: Slack, Google Calendar and auto-reply are listed **out of scope** in §3 of the spec and as extensions 1–3 in §13. `src/external` implements all three. That was a deliberate step toward the auto mode, but it is a scope change the team has not formally agreed, and the spec has deliberately been left untouched rather than edited unilaterally.
 
 ## Run locally
 

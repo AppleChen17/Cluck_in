@@ -228,6 +228,97 @@ no calendar entry — visible in the output, not silent.
 With `EXTERNAL_SEND_DRY_RUN=true` (the default) nothing is sent; watch
 `GET /outbox` for what it would have said.
 
+## What `ai-engine` still needs
+
+The demo script talks to Ollama directly instead of going through
+`src/ai-engine`, and that is not a shortcut — `ai-engine` cannot answer the
+question. `/analyze-message` returns `urgent` / `allow` / `hold`, which is about
+whether to interrupt you. Auto-reply needs a different one: *is this person
+telling me a meeting time, or not?*
+
+So one endpoint is missing. Sketched here in the style of that module's
+`schemas.py`, for whoever owns it:
+
+```python
+class AnalyzeIntentRequest(BaseModel):
+    message: ExternalMessage
+    context: SessionContext
+    now: datetime                    # required, see below
+
+class AnalyzeIntentResponse(BaseModel):
+    intent: Literal["meeting_invite", "other"]
+    reason: str
+    # meeting_invite only
+    startTime: datetime | None = None
+    durationMinutes: int | None = None
+    title: str | None = None
+```
+
+Two values, not three. An earlier draft also had `asking_availability` — "they
+are asking when you are free" — which would be answered from
+`POST /calendar/availability`. It was dropped to keep the first cut small. The
+endpoint that answers it still exists and is tested, so adding the third value
+later costs one enum entry and one branch, not a redesign.
+
+**This is a new contract.** `docs/data-contracts.md` says to agree on one before
+implementing against it, and §11 of the spec lists the changes already pending.
+This is not on that list yet.
+
+### Four things that cost time to find
+
+**`now` must be in the request.** The model does not know what day it is and
+will confidently pick one. The demo passes `Now: 2026-09-19T22:10+08:00
+(星期六)` at the top of the user prompt.
+
+**Ollama's `format` needs a FLAT schema.** Its JSON-Schema-to-grammar converter
+does not handle `$ref` or `$defs` reliably, so `shared/schemas/*.json` cannot be
+handed to it directly. It also ignores `minimum` / `maximum`, so numeric bounds
+have to be clamped in Python afterwards.
+
+**Field order is generation order.** Putting `reason` before `intent` makes the
+model justify before it commits to a label. On a 3b model that is a free quality
+gain; on a large one it costs nothing.
+
+**Never ask the model to echo an id back.** A 3b model asked to reproduce
+`slack:C08ABCDEF:1789788720.000200` drops a digit. The caller injects it.
+
+### Worth deciding at the same time
+
+Whether `startTime` belongs in the response at all.
+
+Extracting the time is where this goes wrong. Measured on real messages:
+`下午兩點四十五` → 14:45, `下午一點半` → 13:30, `10/24 15:00` → 15:00 — and
+`下週二下午三點` → 13:00 on one run and 15:00 on another, from an identical
+prompt at `temperature: 0`.
+
+Parsing Chinese time expressions in code instead would fix that, and is faster.
+Measured on this machine with `qwen2.5:3b-instruct`:
+
+| the model outputs | time |
+|---|---|
+| reason + startTime + duration + title (69 tokens) | 3.95 s |
+| the label alone (12 tokens) | 0.83 s |
+| a keyword pre-filter, no model call at all | 0.0029 ms |
+
+Generation is per-token, so a shorter answer is a proportionally faster one. A
+deterministic parser therefore buys correctness and roughly 5x at once, and the
+failure mode changes from *a confidently wrong time* to *no time, and it says
+so* — which is the difference between a meeting on the wrong day and a meeting
+nobody scheduled.
+
+That parser belongs next to the classification, in `ai-engine`, not here.
+`src/external` does not decide anything and should not start.
+
+### And routing through `ai-engine` costs nothing
+
+Measured on this machine: one localhost HTTP round trip is **6.2 ms**, one
+classification is **3.9 s**. Going `app → ai-engine → app` adds two hops, about
+12 ms, to a 3.9 second operation — **0.3%**, which is below the run-to-run noise
+of the model itself.
+
+There is no latency argument for `src/external` calling a model directly, and it
+will not. Nor is there one for `src/app` skipping `ai-engine`.
+
 ## `scripts/try_llm.py`
 
 A standalone probe that feeds real fetched messages to a local Ollama model and
