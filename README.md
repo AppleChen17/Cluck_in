@@ -10,7 +10,7 @@ The MVP scope, state machine, key layout and open questions are in [docs/PRODUCT
 | --- | --- | --- | --- |
 | `src/app/` | Desktop app: focus timer, workspace and task rules, foreground-window and browser-URL sampling, chicken intervention window, HTTP API on `:5180` | C# / WPF / .NET 10 (Windows) | Implemented — see [`src/app/README.md`](src/app/README.md) |
 | `CluckInPlugin/` | Logitech MX Creative Console plugin: physical keys, key-face state, Idle/Focus and AI Assist control, posts input events over HTTP | C# / .NET 10 | Implemented — see [`CluckInPlugin/INTEGRATION.md`](CluckInPlugin/INTEGRATION.md) |
-| `src/external/` | Gmail (IMAP) and Slack (Socket Mode) normalized into `ExternalMessage`; sends replies back out over SMTP and `chat.postMessage`; reads and writes Google Calendar. On `:8100` | Python / FastAPI | Implemented — see [`src/external/README.md`](src/external/README.md) |
+| `src/external/` | Gmail (IMAP) and Slack (Socket Mode) normalized into `ExternalMessage`; sends replies back out over SMTP and `chat.postMessage`; reads and writes Google Calendar. On `:8100` | Python / FastAPI | Implemented, and verified end to end against real accounts — see [`src/external/README.md`](src/external/README.md) |
 | `src/ai-engine/` | Decision engine over a local Ollama model: `/analyze-message`, `/analyze-task`, on `:8000` | Python / FastAPI | Implemented — see [`src/ai-engine/README.md`](src/ai-engine/README.md) |
 | `src/web/` | Dashboard, task launcher, workspace rules editor and intervention prompt, on `:5173` | React + TypeScript + Vite | Task launcher and intervention call the app's API; the timer and AI cards and the workspace rules editor are still mock data |
 | `src/app-demo/` | The original console entry point; prints context and evaluation snapshots | C# / .NET 10 | Works, kept for debugging |
@@ -145,7 +145,7 @@ python CluckInPlugin\tools\mock_receiver.py
 Three independent suites. None needs credentials or network access.
 
 ```powershell
-# Python: src/external, 266 checks
+# Python: src/external, 270 checks
 .\.venv\Scripts\python.exe -m pytest
 
 # C#: desktop context, task API, ViewModel, intervention

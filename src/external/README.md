@@ -74,6 +74,25 @@ Every setting lives in `src/external/.env`; see
 Credentials setup is in [`docs/Setup.md`](docs/Setup.md), including why the
 calendar is the one thing here that cannot use an app password.
 
+### Verified against real accounts
+
+Everything below was exercised end to end against a real Gmail account, a real
+Slack workspace and a real Google Calendar, not only against the test suite:
+
+| | |
+|---|---|
+| Slack Socket Mode in, `chat.postMessage` and `reactions.add` out | works |
+| Gmail IMAP in, SMTP out, copy filed in Sent | works |
+| Reply threading (`In-Reply-To` on a real send) | works |
+| `freebusy`, `events.list`, `events.insert` | works |
+| One reply per message, one event per `fromMessageId` | both triggered and held |
+
+Two things that only showed up once real credentials were involved, and that no
+test would have caught, are written up under **Known limitations** below:
+`freebusy` needs a scope the other calls do not, and a calendar whose own
+timezone setting is wrong displays every event at the wrong hour while storing
+the right instant.
+
 ## Tests
 
 ```powershell
@@ -81,7 +100,7 @@ cd C:\Users\user\Desktop\Cluck_in
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-266 tests, no credentials and no network required. Gmail parsing runs against
+270 tests, no credentials and no network required. Gmail parsing runs against
 canned RFC 822 bytes and Slack against canned event payloads, so the whole
 normalization surface — MIME multipart, Big5, RFC 2047 subjects, HTML
 flattening, quoted-reply trimming, Slack markup, event filtering — is covered
@@ -190,9 +209,11 @@ Two things it does on purpose, both worth copying into the C# side:
 - **An extracted meeting time is validated before use.** No offset, unparseable,
   or in the past means no calendar entry and a line saying so. Models reach for
   the current year and last week's weekday; a meeting on the wrong day is worse
-  than no meeting. Verified on real messages: three of four times were extracted
-  correctly, and "下午三點" became 13:00 once, from the same input that gave
-  15:00 on another run. Treat every extracted time as unverified.
+  than no meeting. Verified on real messages: four of five times were extracted
+  correctly ("下午兩點四十五" → 14:45, "下午一點半" → 13:30, "10/24 15:00" →
+  15:00), and "下週二下午三點" became 13:00 once, from the same input that gave
+  15:00 on another run at `temperature: 0`. Treat every extracted time as
+  unverified.
 - **It says which time it wrote, and does not offer to correct it.** Showing the
   inference is what lets a person catch a bad one. Offering to fix it would be a
   lie today: a reply in that thread is classified as a brand new message with no
@@ -264,6 +285,16 @@ is what changes between machines.
   DMs with the bot itself. Reading your own DMs needs a user token (`xoxp-`).
 - **Sending is off by default and that is the most likely reason a reply did not
   arrive.** Check `sending.dryRun` in `/health` first.
+- **Google Calendar displays events in the calendar's own timezone, not the
+  event's.** An event created correctly at `18:00+08:00` shows as `10:00` on a
+  calendar whose timezone setting is UTC. The stored instant is right and the
+  API round trip is right; only the grid is wrong, and nothing in this module
+  can fix it -- the setting is in Google Calendar, under the gear icon. Worth
+  checking before a demo, because "the AI put the meeting at 10am" is a
+  convincing-looking bug that is not a bug.
+- **Gmail is up to `GMAIL_POLL_SECONDS` behind.** Measured at ~40s end to end on
+  a 30s poll. Slack is a push and arrives in seconds. Do not read a quiet
+  minute as a failure.
 - **The reply registry is in memory too.** After a restart `GET /messages`
   replays what it has, but those messages can no longer be answered by id;
   `POST /reply` returns a `404` saying so, and `/send/gmail` and `/send/slack`
