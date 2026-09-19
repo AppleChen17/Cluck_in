@@ -10,6 +10,8 @@ public class FocusControlCommand : PluginDynamicCommand{
             groupName: "CluckIn")
     {
         MainController.ModeChanged += this.OnStateChanged;
+        IdleChickenAnimation.FrameChanged += this.OnIdleFrameChanged;
+        FocusChickenAnimation.FrameChanged += this.OnFocusFrameChanged;
         MainController.FocusTimerChanged +=
             this.OnStateChanged;
     }
@@ -25,7 +27,7 @@ public class FocusControlCommand : PluginDynamicCommand{
         PluginImageSize imageSize)
     {
         if(MainController.CurrentMode != CluckInMode.Focus){
-            return "FOCUS";
+            return "\u200B";
         }
 
         return MainController.CurrentFocusTimerState switch{
@@ -41,13 +43,33 @@ public class FocusControlCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
-        return ButtonImageRenderer.DrawDeskState(
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            return IdleChickenAnimation.Current?.Draw(imageSize);
+        }
+
+        return FocusChickenAnimation.Current?.DrawKey5(
+            imageSize,
             MainController.CurrentFocusTimerState,
             MainController.FocusProgress
         );
+    }
+
+    private void OnFocusFrameChanged(){
+        if(MainController.CurrentMode == CluckInMode.Focus){
+            this.ActionImageChanged();
+        }
+    }
+
+    private void OnIdleFrameChanged(){
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            this.ActionImageChanged();
+        }
     }
 
     private void OnStateChanged(){
         this.ActionImageChanged();
     }
 }
+
+
+

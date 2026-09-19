@@ -1,6 +1,7 @@
 import time
 import requests
 import subprocess
+import json
 
 from config import OLLAMA_BASE_URL, OLLAMA_MODEL
 from schemas import (
@@ -8,6 +9,8 @@ from schemas import (
     AIDecision,
     TaskAnalyzeRequest,
     TaskDecision,
+    MessageSummaryResponse,
+    MessageSummaryRequest
 )
 from services.llm_provider import LLMProvider
 
@@ -281,3 +284,66 @@ class OllamaProvider(LLMProvider):
         ])
 
         return TaskDecision.model_validate_json(result)
+
+    def summarize_messages(
+        self,
+        request: MessageSummaryRequest
+    ) -> MessageSummaryResponse:
+
+        if not request.messages:
+            return MessageSummaryResponse(
+                messageCount=0,
+                summary="目前沒有被暫緩的訊息。"
+            )
+
+        message_text = "\n\n".join(
+            f"""
+    Message {index + 1}
+    source: {message.source}
+    sender: {message.sender}
+    title: {message.title}
+    timestamp: {message.timestamp}
+    content: {message.content}
+    """.strip()
+            for index, message in enumerate(request.messages)
+        )
+
+        prompt = f"""
+    你是訊息摘要助手。
+
+    以下是使用者進入 Focus Mode 後被暫緩的訊息。
+
+    請整理成一段簡短摘要，讓使用者可以快速知道專注期間發生什麼事。
+
+    規則：
+    - 保留重要人物、時間、地點、任務與異動
+    - 保留原訊息中的時間與完成狀態，不得將未完成或未來事件描述為已完成。
+    - 不要加入原訊息沒有的資訊
+    - 合併重複內容
+    - 不需要逐封列出
+    - 使用臺灣繁體中文
+    - 簡潔易讀
+    - 只輸出 JSON
+
+    訊息：
+    {message_text}
+
+    輸出：
+    {{
+    "summary": "string"
+    }}
+    """
+
+        result = self._chat([
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ])
+
+        data = json.loads(result)
+
+        return MessageSummaryResponse(
+            messageCount=len(request.messages),
+            summary=data["summary"]
+        )

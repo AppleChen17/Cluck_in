@@ -9,8 +9,17 @@ public class FocusStopCommand : PluginDynamicCommand{
             description: "Stop the current focus timer",
             groupName: "CluckIn")
     {
+        MainController.ModeChanged += () => this.ActionImageChanged();
+        IdleChickenAnimation.StatisticsChanged += this.OnIdleChanged;
+        FocusChickenAnimation.FrameChanged += this.OnFocusFrameChanged;
         MainController.FocusTimerChanged +=
             this.OnStateChanged;
+    }
+
+    private void OnIdleChanged(){
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            this.ActionImageChanged();
+        }
     }
 
     protected override void RunCommand(
@@ -23,6 +32,9 @@ public class FocusStopCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            return IdleChickenAnimation.Statistic(v => v.SuccessfulFeedCount, "FED");
+        }
         return "END";
     }
 
@@ -30,12 +42,25 @@ public class FocusStopCommand : PluginDynamicCommand{
         String actionParameter,
         PluginImageSize imageSize)
     {
-        return ButtonImageRenderer.DrawCoopState(
+        if(MainController.CurrentMode == CluckInMode.Idle){
+            return null; // Native centered statistics text, without a coop image.
+        }
+        return FocusChickenAnimation.Current?.DrawKey6(
+            imageSize,
             MainController.CurrentFocusTimerState
         );
+    }
+
+    private void OnFocusFrameChanged(){
+        if(MainController.CurrentMode == CluckInMode.Focus){
+            this.ActionImageChanged();
+        }
     }
 
     private void OnStateChanged(){
         this.ActionImageChanged();
     }
 }
+
+
+

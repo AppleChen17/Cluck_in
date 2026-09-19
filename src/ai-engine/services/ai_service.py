@@ -4,6 +4,8 @@ from schemas import (
     AIDecision,
     TaskAnalyzeRequest,
     TaskDecision,
+    MessageSummaryResponse,
+    MessageSummaryRequest
 )
 
 
@@ -23,3 +25,9 @@ class AIService:
         request: TaskAnalyzeRequest
     ) -> TaskDecision:
         return self.provider.analyze_task(request)
+
+    def summarize_messages(
+        self,
+        request: MessageSummaryRequest
+    ) -> MessageSummaryResponse:
+        return self.provider.summarize_messages(request)

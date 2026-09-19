@@ -5,6 +5,8 @@ from schemas import (
     AIDecision,
     TaskAnalyzeRequest,
     TaskDecision,
+    MessageSummaryRequest,
+    MessageSummaryResponse
 )
 from services.ollama_provider import OllamaProvider
 from services.ai_service import AIService
@@ -44,3 +46,12 @@ def analyze_task(
     request: TaskAnalyzeRequest
 ):
     return ai_service.analyze_task(request)
+
+@app.post(
+    "/summarize-messages",
+    response_model=MessageSummaryResponse
+)
+def summarize_messages(
+    request: MessageSummaryRequest
+) -> MessageSummaryResponse:
+    return ai_service.summarize_messages(request)

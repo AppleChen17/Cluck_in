@@ -10,8 +10,15 @@ namespace Loupedeck.CluckInPlugin
                 description: "Change AI assist policy",
                 groupName: "CluckIn")
         {
+            IdleChickenAnimation.StatisticsChanged += this.OnIdleChanged;
             MainController.ModeChanged += this.OnStateChanged;
             MainController.AIAssistModeChanged += this.OnStateChanged;
+        }
+
+        private void OnIdleChanged(){
+            if(MainController.CurrentMode == CluckInMode.Idle){
+                this.ActionImageChanged();
+            }
         }
 
         protected override void RunCommand(String actionParameter)
@@ -24,7 +31,7 @@ namespace Loupedeck.CluckInPlugin
             PluginImageSize imageSize)
         {
             if(MainController.CurrentMode == CluckInMode.Idle){
-                return "Pet";
+                return IdleChickenAnimation.Statistic(v => v.FeedCount, "FEED");
             }
 
             return MainController.CurrentAIAssistMode switch{

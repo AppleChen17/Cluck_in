@@ -15,6 +15,7 @@ def main() -> None:
         ("PET_CHICKEN", None),
         ("tick", None),
         ("SET_MOOD", {"mood": "thinking"}),
+        ("SET_FEED", {"count": 1}),
         ("FEED_CHICKEN", None),
         ("tick", None),
         ("STOP_FOCUS", None),

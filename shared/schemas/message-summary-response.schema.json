@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/message-summary-response.schema.json",
+  "title": "MessageSummaryResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageCount",
+    "summary"
+  ],
+  "properties": {
+    "messageCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of messages included in this summary."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

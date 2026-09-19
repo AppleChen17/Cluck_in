@@ -25,7 +25,10 @@ public static class DesktopAgentFactory
     public static void RegisterServices(IServiceCollection services)
     {
         services.AddSingleton<IWorkspaceManager>(_ => CreateWorkspaces());
-        services.AddSingleton<ITimerManager, TimerManager>();
+        services.AddSingleton<ChickenProgressReporter>();
+        services.AddHostedService(provider => provider.GetRequiredService<ChickenProgressReporter>());
+        services.AddSingleton<ITimerManager>(provider => new ProgressTrackingTimer(
+            new TimerManager(), provider.GetRequiredService<ChickenProgressReporter>().Record));
         services.AddSingleton<IWindowManager, WindowManager>();
         services.AddSingleton<IBrowserManager, BrowserManager>();
         services.AddSingleton<IBrowserUrlReader, BrowserUrlReader>();
