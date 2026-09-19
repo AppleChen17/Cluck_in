@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Windows.Threading;
 using CluckIn.App.Interfaces;
 using CluckIn.App.Managers;
@@ -37,7 +38,21 @@ static class TaskChecks
         var desktop = new FakeDesktop(() =>
             Check(session.CurrentTask?.Id == "test" && whitelist.CurrentWhitelist?.Id == "test", "State and whitelist loaded before launch"));
         var manager = new TaskManager(desktop, session, whitelist, focus, repository, NullLogger<TaskManager>.Instance);
-        await manager.StartTaskAsync("test");
+        var frontendDesktop = new FakeDesktop(() => { });
+        var inputHandler = new InputEventHandler(manager, frontendDesktop);
+        await inputHandler.HandleAsync(new()
+        {
+            Type = "SHOW_TASK_SELECTION", Source = "logitech", Timestamp = DateTimeOffset.Now,
+            Payload = JsonSerializer.SerializeToElement(new { })
+        });
+        Check(frontendDesktop.Opened.SequenceEqual(["http://localhost:5173/#tasks"]) &&
+            session.CurrentTask is null && desktop.Opened.Count == 0,
+            "Opening frontend task UI does not start a task or launch task resources");
+        await inputHandler.HandleAsync(new()
+        {
+            Type = "SELECT_TASK", Source = "logitech", Timestamp = DateTimeOffset.Now,
+            Payload = JsonSerializer.SerializeToElement(new { taskId = "test" })
+        });
         Check(desktop.Opened.SequenceEqual(["broken", "working", "bad-url", "https://github.com"]), "Apps before URLs, deduplication and failure isolation");
         Check(timer.GetCurrentSession() is { Status: FocusSessionStatus.Running, Duration.TotalMinutes: 50 }, "50 minute focus started after launches");
         await repository.SaveTaskAsync(new() { Id = "no-timer", Name = "No timer" });
@@ -81,7 +96,12 @@ static class TaskChecks
             {
                 try
                 {
-                    await using var app = TaskApiHost.Create(dispatcher);
+                    var desktop = new FakeDesktop(() =>
+                    {
+                        if (!dispatcher.CheckAccess()) throw new Exception("Launch must run on dispatcher");
+                    });
+                    await using var app = TaskApiHost.Create(dispatcher,
+                        services => services.AddSingleton<IDesktopManager>(desktop));
                     app.Urls.Clear();
                     app.Urls.Add("http://127.0.0.1:0");
                     await app.StartAsync();
@@ -103,6 +123,30 @@ static class TaskChecks
                         var agent = app.Services.GetRequiredService<DesktopAgentService>();
                         var context = await agent.GetContextAsync();
                         if (context.WorkspaceId != "api-test" || !context.TimerRunning) throw new Exception("API and desktop do not share state");
+                        desktop.Opened.Clear();
+                        object Input(string type, object payload) => new { type, source = "logitech", timestamp = DateTimeOffset.Now, payload };
+                        var showPicker = await client.PostAsJsonAsync("/input-event", Input("SHOW_TASK_SELECTION", new { }));
+                        showPicker.EnsureSuccessStatusCode();
+                        if (!desktop.Opened.SequenceEqual(["http://localhost:5173/#tasks"]) ||
+                            agent.CurrentTask?.Id != "api-test" || !((await agent.GetContextAsync()).TimerRunning))
+                            throw new Exception("Frontend request must open only Task UI and preserve task/timer state");
+                        (await client.PutAsJsonAsync("/api/tasks/console-test", new TaskProfile { Id = "console-test", Name = "Console Test" })).EnsureSuccessStatusCode();
+                        var selected = await client.PostAsJsonAsync("/input-event", Input("SELECT_TASK", new { taskId = "console-test" }));
+                        selected.EnsureSuccessStatusCode();
+                        var consoleSession = await client.GetFromJsonAsync<SessionResponse>("/api/session");
+                        if (consoleSession?.CurrentTask?.Id != "console-test" || agent.CurrentTask?.Id != "console-test" ||
+                            consoleSession.FocusSession.Status != FocusSessionStatus.Stopped)
+                            throw new Exception("Console selection did not share task/session state or stop old timer");
+                        foreach (var payload in new object[] { new { }, new { taskId = "" }, new { taskId = 42 }, new[] { "invalid" } })
+                        {
+                            var badInput = await client.PostAsJsonAsync("/input-event", Input("SELECT_TASK", payload));
+                            if (badInput.StatusCode != HttpStatusCode.BadRequest) throw new Exception("Invalid task input accepted");
+                        }
+                        var missingInput = await client.PostAsJsonAsync("/input-event", Input("SELECT_TASK", new { taskId = "missing" }));
+                        if (missingInput.StatusCode != HttpStatusCode.NotFound || agent.CurrentTask?.Id != "console-test")
+                            throw new Exception("Missing input task must preserve current task");
+                        var unsupportedInput = await client.PostAsJsonAsync("/input-event", Input("UNKNOWN", new { }));
+                        if (unsupportedInput.StatusCode != HttpStatusCode.BadRequest) throw new Exception("Unsupported event accepted");
                         var intervention = await client.GetFromJsonAsync<InterventionState>("/api/intervention");
                         if (intervention is not { IsActive: false }) throw new Exception("Unexpected initial intervention");
                         var staleAction = await client.PostAsJsonAsync("/api/intervention/action", new InterventionActionRequest(Guid.NewGuid(), InterventionAction.TemporaryAllow));
@@ -125,7 +169,9 @@ static class TaskChecks
                         client.DefaultRequestHeaders.Add("Origin", "https://untrusted.example");
                         var origin = await client.PostAsJsonAsync("/api/tasks/api-test/start", new { });
                         if (origin.StatusCode != HttpStatusCode.Forbidden) throw new Exception("Untrusted origin accepted");
-                        Console.WriteLine("Passed 13 Task/Intervention API integration checks (no real app or URL launched).");
+                        var inputOrigin = await client.PostAsJsonAsync("/input-event", Input("SELECT_TASK", new { taskId = "console-test" }));
+                        if (inputOrigin.StatusCode != HttpStatusCode.Forbidden) throw new Exception("Untrusted input origin accepted");
+                        Console.WriteLine("Passed Task/InputEvent/Intervention API integration checks (no real app or URL launched).");
                     }
                     finally { await app.StopAsync(); }
                     completion.SetResult();

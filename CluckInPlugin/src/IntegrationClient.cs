@@ -11,7 +11,7 @@ public static class IntegrationClient{
         "http://127.0.0.1:8765/input-event";
 
     private static readonly HttpClient Client = new HttpClient{
-        Timeout = TimeSpan.FromSeconds(2)
+        Timeout = TimeSpan.FromSeconds(30)
     };
 
     private static readonly JsonSerializerOptions JsonOptions =
@@ -26,7 +26,9 @@ public static class IntegrationClient{
             );
 
             if(string.IsNullOrWhiteSpace(url)){
-                url = DefaultUrl;
+                url = inputEvent.Type is "SELECT_TASK" or "SHOW_TASK_SELECTION"
+                    ? "http://127.0.0.1:5180/input-event"
+                    : DefaultUrl;
             }
 
             var json = JsonSerializer.Serialize(
@@ -44,6 +46,8 @@ public static class IntegrationClient{
                 url,
                 content
             );
+
+            response.EnsureSuccessStatusCode();
 
             PluginLog.Info(
                 $"InputEvent sent: type={inputEvent.Type}, status={(int)response.StatusCode}"

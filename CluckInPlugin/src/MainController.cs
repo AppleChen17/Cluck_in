@@ -278,7 +278,20 @@ public static class MainController{
     }
 
     private static void HandleKey4(){
-        PluginLog.Info("Task selection opened");
+        RequestAction(4, CluckInAction.SelectTask);
+        SendInputEvent("SHOW_TASK_SELECTION", new Dictionary<string, object>(), 4);
+    }
+
+    public static void SelectTask(string taskId){
+        if(string.IsNullOrWhiteSpace(taskId)){
+            return;
+        }
+
+        SendInputEvent(
+            "SELECT_TASK",
+            new Dictionary<string, object>{ ["taskId"] = taskId },
+            4
+        );
     }
 
     private static void HandleFocusControlKey(){

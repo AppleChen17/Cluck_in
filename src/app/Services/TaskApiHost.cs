@@ -13,7 +13,7 @@ namespace CluckIn.App.Services;
 
 public static class TaskApiHost
 {
-    public static WebApplication Create(Dispatcher dispatcher)
+    public static WebApplication Create(Dispatcher dispatcher, Action<IServiceCollection>? configureServices = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
         builder.WebHost.UseUrls("http://127.0.0.1:5180");
@@ -26,6 +26,7 @@ public static class TaskApiHost
             .AddEnvironmentVariables();
         builder.Services.Configure<AiEngineOptions>(builder.Configuration.GetSection("AiEngine"));
         DesktopAgentFactory.RegisterServices(builder.Services);
+        configureServices?.Invoke(builder.Services);
         var app = builder.Build();
 
         // A web page must not be able to launch local programs through a blind form POST.
@@ -70,6 +71,12 @@ public static class TaskApiHost
             }
         });
 
+        app.MapPost("/input-event", async (InputEventRequest input, InputEventHandler handler) =>
+            await (await dispatcher.InvokeAsync(async () =>
+            {
+                await handler.HandleAsync(input);
+                return Results.Ok(new { success = true });
+            })));
         app.MapGet("/api/tasks", (ITaskRepository repository) => repository.GetTasksAsync());
         app.MapGet("/api/tasks/{taskId}", async (string taskId, ITaskManager manager) =>
             await manager.GetTaskAsync(taskId) is { } profile

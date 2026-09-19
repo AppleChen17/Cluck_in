@@ -34,7 +34,7 @@ export default function TaskLauncher({ onStarted }: { onStarted: (name: string) 
     finally { setBusy(false); setStartingTaskId(null); }
   }
 
-  return <section className="card tasks-panel" aria-labelledby="tasks-heading">
+  return <section id="tasks" tabIndex={-1} className="card tasks-panel" aria-labelledby="tasks-heading">
     <div className="card-heading tasks-heading">
       <h2 id="tasks-heading">Tasks</h2>
       <button className="tasks-refresh" type="button" disabled={busy}

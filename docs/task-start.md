@@ -97,8 +97,53 @@ Missing tasks return 404; invalid profiles/JSON return 400; unexpected failures 
 `Content-Type: application/json`. The listener binds only to loopback, checks Host
 and Origin, and does not enable CORS for arbitrary websites.
 
-Creative Console can send the same POST request. The repository currently has no
-Creative Console button implementation to wire directly.
+## Creative Console task selection
+
+The **Task** button calls `TaskCommand.RunCommand` → `MainController.HandleKeyEvent(4)`
+→ `SHOW_TASK_SELECTION` → `IntegrationClient` → `POST http://127.0.0.1:5180/input-event`.
+`TaskApiHost` dispatches the event to the singleton `InputEventHandler` on the WPF
+dispatcher, then reuses `IDesktopManager.OpenUrlAsync` to open
+`http://localhost:5173/#tasks` in the default browser. The frontend displays the
+dashboard and scrolls/focuses its existing Tasks section. There is no WPF task picker.
+Repeated presses may open additional tabs; existing-tab reuse is browser-dependent.
+
+Clicking **Start Task** in the existing `TaskLauncher` calls `taskService.startTask`,
+then `POST /api/tasks/{taskId}/start` and `ITaskManager.StartTaskAsync` as before.
+Merely opening the frontend does not change the current task, whitelist, or timer.
+An explicit nonempty Task command parameter still sends `SELECT_TASK` with
+`payload.taskId` directly to `InputEventHandler`, which calls the same TaskManager.
+There are no app paths or launch instructions in the plugin.
+`SessionManager.CurrentTask` updates before resources launch; `ContextManager` reads
+that task, and the WPF dashboard displays it on its next one-second refresh.
+
+Task events default to the desktop listener on port 5180. Other plugin events retain
+their existing port 8765 receiver and are outside this integration. The environment
+variable `CLUCKIN_INPUT_EVENT_URL` overrides both routes: remove an old mock-receiver
+override and restart Logi Plugin Service to use the defaults. Task failures are logged
+by the plugin; failed HTTP responses are not logged as successful sends.
+
+Start both the desktop app and the Web dev server (`npm run dev` in `src/web`)
+on port 5173 before pressing the Console Task button. The event opens the frontend;
+it does not start the dev server. If the server is unavailable, the browser shows
+its connection error and no task starts. To test without hardware, send:
+
+```powershell
+$inputEvent = @{
+  type = 'SHOW_TASK_SELECTION'
+  source = 'logitech'
+  timestamp = [DateTimeOffset]::Now.ToString('o')
+  payload = @{}
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:5180/input-event' `
+  -ContentType 'application/json' -Body $inputEvent
+```
+
+Select **Cluck In Development**, click **Start Task**, and verify its applications,
+websites, Current Task, and 50-minute timer. `GET /api/session` must show `task_001`.
+For direct selection, use `type = 'SELECT_TASK'` and `payload = @{ taskId = 'task_001' }`.
+Try an unknown ID (404) or missing ID (400): neither changes the active task. Create
+another task with the PUT example above and verify switching launches its resources
+and replaces the task rules. The existing Web start button should continue to work.
 
 ## Verification
 

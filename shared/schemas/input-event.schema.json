@@ -21,6 +21,7 @@
         "RESUME_FOCUS",
         "CHANGE_MODE",
         "SELECT_TASK",
+        "SHOW_TASK_SELECTION",
         "FEED_CHICKEN",
         "PET_CHICKEN"
       ]

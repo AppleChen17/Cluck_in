@@ -352,7 +352,13 @@ The long-running worker belongs to Python/App, not the Logitech Plugin Service.
 
 ## 10. Key 4 - Task selection with dial
 
-Pressing Key 4 should enter task-selection mode.
+Current implementation: Key 4 sends `SHOW_TASK_SELECTION` to the desktop app.
+The app uses its existing DesktopManager to open `http://localhost:5173/#tasks`.
+The Web frontend's existing **Start Task** button calls `/api/tasks/{taskId}/start`
+and `TaskManager.StartTaskAsync`. No WPF task picker is used. Run the Web dev server
+on port 5173; repeated presses may open additional browser tabs.
+The following dial interaction remains a future UI enhancement; dial-based task
+navigation is not implemented. An explicit Task command parameter can supply a task ID directly.
 
 ```text
 press Key 4
@@ -364,7 +370,7 @@ press Key 4
 
 Do not send SELECT_TASK immediately when Key 4 is first pressed.
 
-Recommended final event:
+Task selection event (use a repository ID, not a display name):
 
 ```json
 {
@@ -372,7 +378,7 @@ Recommended final event:
   "source": "logitech",
   "timestamp": "2026-09-19T14:30:00+08:00",
   "payload": {
-    "currentTask": "Implement Logitech Actions SDK"
+    "taskId": "task_001"
   },
   "metadata": {
     "keyId": 4
@@ -538,7 +544,11 @@ Do not modify shared schemas from the Logitech branch without team agreement.
 
 ## 15. Python integration
 
-Current local development endpoint:
+Task events (`SHOW_TASK_SELECTION`, `SELECT_TASK`) default to the desktop app at
+`http://127.0.0.1:5180/input-event`. The desktop app owns selection UI, current task,
+and application/website launch. See [task startup and manual testing](../docs/task-start.md).
+
+Other events retain the local development endpoint:
 
 ```text
 POST http://127.0.0.1:8765/input-event
@@ -546,7 +556,8 @@ POST http://127.0.0.1:8765/input-event
 
 Logitech uses `IntegrationClient` to send InputEvent JSON.
 
-The endpoint can later be pointed at the real app/backend.
+The environment override below applies to all events. Remove any old mock override
+and restart Logi Plugin Service to use the default task route.
 
 Recommended environment variable:
 

@@ -11,6 +11,12 @@ export default function App() {
     window.addEventListener('hashchange', update);
     return () => window.removeEventListener('hashchange', update);
   }, []);
+  useEffect(() => {
+    if (route !== '#tasks') return;
+    const tasks = document.getElementById('tasks');
+    tasks?.scrollIntoView({ block: 'start' });
+    tasks?.focus({ preventScroll: true });
+  }, [route]);
   const editingRules = route === '#/workspace-rules';
   return (
     <>

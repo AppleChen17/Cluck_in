@@ -14,7 +14,10 @@ namespace Loupedeck.CluckInPlugin
 
         protected override void RunCommand(String actionParameter)
         {
-            MainController.HandleKeyEvent(4);
+            if (String.IsNullOrWhiteSpace(actionParameter))
+                MainController.HandleKeyEvent(4);
+            else
+                MainController.SelectTask(actionParameter);
         }
 
         protected override String GetCommandDisplayName(

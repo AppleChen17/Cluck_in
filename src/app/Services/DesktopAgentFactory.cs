@@ -36,6 +36,7 @@ public static class DesktopAgentFactory
         services.AddSingleton<IWhitelistManager, WhitelistManager>();
         services.AddSingleton<IDesktopManager, DesktopManager>();
         services.AddSingleton<ITaskManager, TaskManager>();
+        services.AddSingleton<InputEventHandler>();
         services.AddOptions<AiEngineOptions>().Validate(o =>
             Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out var uri) &&
             (uri.Scheme == "http" || uri.Scheme == "https") && o.TimeoutSeconds > 0 &&
