@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chicken-view.schema.json",
+  "title": "ChickenView",
+  "description": "GET /view snapshot for Main / logitech. Push frames/{chicken} to keypad button 5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mood", "chicken", "fps", "loop", "nestIcon", "feedCount"],
+  "properties": {
+    "mood": {
+      "type": "string",
+      "enum": ["idle", "focused", "thinking", "feed", "pet", "tired"]
+    },
+    "chicken": {
+      "type": "string",
+      "description": "PNG filename under src/chicken/frames/",
+      "pattern": "^[a-z]+_[0-9]{2}\\.png$"
+    },
+    "fps": { "type": "integer", "minimum": 1 },
+    "loop": { "type": "boolean" },
+    "frameDir": { "type": "string" },
+    "nestIcon": { "type": "string", "const": "nest_icon.png" },
+    "feedCount": { "type": "integer", "minimum": 0 },
+    "chickenUrl": { "type": "string" }
+  }
+}

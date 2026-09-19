@@ -1,0 +1,9 @@
+{
+  "mood": "focused",
+  "chicken": "focused_00.png",
+  "fps": 3,
+  "loop": true,
+  "frameDir": "src/chicken/frames",
+  "nestIcon": "nest_icon.png",
+  "feedCount": 1
+}
