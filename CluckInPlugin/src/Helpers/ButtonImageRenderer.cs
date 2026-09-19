@@ -3,82 +3,23 @@
 using System;
 
 internal static class ButtonImageRenderer{
-    public static BitmapImage DrawTimerField(
-        String unit,
-        Int32 value,
-        Boolean selected,
-        Boolean flash,
-        Boolean timerActive,
-        Double segmentRemainingRatio,
-        PluginImageSize imageSize)
-    {
-        var dark = new BitmapColor(24, 24, 26);
-        var highlight = new BitmapColor(31, 116, 145);
-        var running = new BitmapColor(37, 128, 94);
-        var completion = new BitmapColor(220, 157, 36);
+    internal static class ButtonImageRenderer{
+        public static BitmapImage DrawTimerField(
+            String unit,
+            Int32 value,
+            Boolean selected,
+            Boolean flash,
+            Boolean timerActive,
+            Double segmentRemainingRatio,
+            PluginImageSize imageSize)
+        {
+            var dark = new BitmapColor(24, 24, 26);
 
-        // The SDK maps None to 0x0 and ToImage() then returns null.
-        if(imageSize == PluginImageSize.None){
-            imageSize = PluginImageSize.Width90;
-        }
-
-        using(var bitmapBuilder = new BitmapBuilder(imageSize)){
-            bitmapBuilder.Clear(
-                flash
-                    ? completion
-                    : selected && !timerActive
-                        ? highlight
-                        : dark
-            );
-
-            if(timerActive && !flash){
-                var ratio = Double.IsFinite(
-                    segmentRemainingRatio
-                )
-                    ? Math.Clamp(
-                        segmentRemainingRatio,
-                        0.0,
-                        1.0
-                    )
-                    : 0.0;
-
-                var fillWidth = (Int32)Math.Round(
-                    bitmapBuilder.Width * ratio
-                );
-
-                if(fillWidth > 0){
-                    bitmapBuilder.FillRectangle(
-                        bitmapBuilder.Width - fillWidth,
-                        0,
-                        fillWidth,
-                        bitmapBuilder.Height,
-                        running
-                    );
-                }
+            using(var bitmapBuilder = new BitmapBuilder(imageSize)){
+                bitmapBuilder.Clear(dark);
+                bitmapBuilder.DrawText($"{value:00}{Environment.NewLine}{unit}");
+                return bitmapBuilder.ToImage();
             }
-
-            var displayUnit =
-                selected && !timerActive
-                    ? unit.ToUpperInvariant()
-                    : unit;
-
-            // Keep the SDK's default font size, with two centered, non-overlapping rows.
-            var rowHeight = BitmapBuilder.GetDefaultFontSize(imageSize) + 4;
-            var textTop = (bitmapBuilder.Height - (2 * rowHeight)) / 2;
-            var textColor = new BitmapColor(255, 255, 255);
-
-            bitmapBuilder.DrawText(
-                $"{value:00}",
-                0, textTop, bitmapBuilder.Width, rowHeight,
-                color: textColor
-            );
-            bitmapBuilder.DrawText(
-                displayUnit,
-                0, textTop + rowHeight, bitmapBuilder.Width, rowHeight,
-                color: textColor
-            );
-
-            return bitmapBuilder.ToImage();
         }
     }
 
