@@ -65,3 +65,16 @@ Open the local URL printed by Vite (normally <http://localhost:5173>). All data 
 ## Working agreement
 
 Each developer owns a module. Agree on shared contracts before adding dependencies between modules. No Gmail, Slack, Calendar, Logitech SDK, Ollama, or automation integration is wired up yet — `tests/` is also still empty.
+
+@'
+
+## Logitech MX Creative Console
+
+The Logitech integration is maintained under `CluckInPlugin/`.
+
+Current capabilities include physical MX Creative Console input, Idle/Focus mode control,
+AI Assist state control, semantic event routing, and local Python HTTP integration.
+
+See [`CluckInPlugin/INTEGRATION.md`](CluckInPlugin/INTEGRATION.md) for the current interface,
+testing instructions, key mappings, and integration status.
+'@ | Add-Content .\README.md
