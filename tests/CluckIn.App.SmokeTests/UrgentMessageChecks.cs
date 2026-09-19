@@ -20,6 +20,14 @@ internal static class UrgentMessageChecks
             if (!condition) throw new Exception(name);
             count++;
         }
+        // Without this every run would read and rewrite the real
+        // %LOCALAPPDATA%\CluckIn\urgent-messages.json, so the checks would
+        // depend on what the developer happened to acknowledge yesterday.
+        var stateDirectory = Path.Combine(Path.GetTempPath(), "cluckin-urgent-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(stateDirectory);
+        Environment.SetEnvironmentVariable("CLUCKIN_URGENT_STATE_PATH", Path.Combine(stateDirectory, "state.json"));
+        try
+        {
         var factory = new FakeClients();
         var service = new UrgentMessageService(factory);
         ExternalMessage Message(string id) => new()
@@ -65,8 +73,44 @@ internal static class UrgentMessageChecks
         service.Enqueue(new(Message("preview:test"), "Explicit local preview"));
         await service.PollAsync(new { mode = "focus" }, CancellationToken.None);
         Check(service.Current?.Message.Id == "preview:test", "Fixture check preserves explicitly requested preview");
+
+        // Restarting the app is a new service instance over the same state
+        // file, while the external service replays the same batch.
+        Environment.SetEnvironmentVariable("CLUCKIN_URGENT_STATE_PATH", Path.Combine(stateDirectory, "restart.json"));
+        var replay = new FakeClients { Messages = [Message("kept"), Message("normal")] };
+        var before = new UrgentMessageService(replay);
+        await before.PollAsync(new { mode = "focus" }, CancellationToken.None);
+        Check(before.Count == 1 && before.Current?.Message.Id == "kept", "Urgent alert raised before the restart");
+        before.Acknowledge("kept");
+        Check(before.Count == 0, "Acknowledgement empties the queue");
+
+        var analysisBeforeRestart = replay.AnalysisCalls;
+        var restarted = new UrgentMessageService(replay);
+        await restarted.PollAsync(new { mode = "focus" }, CancellationToken.None);
+        Check(restarted.Count == 0, "Acknowledged message does not reappear after a restart");
+        Check(replay.AnalysisCalls == analysisBeforeRestart, "Restart does not re-analyse messages already handled");
+
+        // The other half of the guarantee: an alert the user never dismissed is
+        // still owed to them, so it must survive rather than be swallowed.
+        Environment.SetEnvironmentVariable("CLUCKIN_URGENT_STATE_PATH", Path.Combine(stateDirectory, "pending.json"));
+        var owed = new FakeClients { Messages = [Message("unread-urgent")] };
+        var raised = new UrgentMessageService(owed);
+        await raised.PollAsync(new { mode = "focus" }, CancellationToken.None);
+        Check(raised.Count == 1, "Urgent alert raised and left unacknowledged");
+        var reopened = new UrgentMessageService(owed);
+        Check(reopened.Count == 1 && reopened.Current?.Message.Id == "unread-urgent",
+            "Unacknowledged alert is restored at startup, before the first poll");
+        reopened.Acknowledge("unread-urgent");
+        Check(new UrgentMessageService(owed).Count == 0, "Acknowledging the restored alert sticks");
+
         await RenderAsync(first);
         Console.WriteLine($"Passed {count} urgent message checks and offscreen WPF rendering (no external services).");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CLUCKIN_URGENT_STATE_PATH", null);
+            try { Directory.Delete(stateDirectory, true); } catch (IOException) { }
+        }
     }
 
     private static Task RenderAsync(UrgentMessage message)
