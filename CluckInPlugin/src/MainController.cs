@@ -1,4 +1,4 @@
-﻿namespace Loupedeck.CluckInPlugin;
+namespace Loupedeck.CluckInPlugin;
 
 using System;
 using System.Collections.Generic;
@@ -395,18 +395,20 @@ public static class MainController{
 
         RequestAction(3, action);
 
-        var eventType = mode switch{
-            AIAssistMode.Off => "AI_ASSIST_OFF",
-            AIAssistMode.Suggestion => "AI_ASSIST_SUGGESTION",
-            AIAssistMode.On => "AI_ASSIST_ON",
+        var modeValue = mode switch{
+            AIAssistMode.Off => "off",
+            AIAssistMode.Suggestion => "suggestion",
+            AIAssistMode.On => "on",
             _ => throw new ArgumentOutOfRangeException(
                 nameof(mode)
             )
         };
 
         SendInputEvent(
-            eventType,
-            new Dictionary<String, Object>(),
+            "SET_AI_ASSIST_MODE",
+            new Dictionary<String, Object>{
+                ["mode"] = modeValue
+            },
             3
         );
 
