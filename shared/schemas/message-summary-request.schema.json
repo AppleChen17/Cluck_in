@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/message-summary-request.schema.json",
+  "title": "MessageSummaryRequest",
+  "description": "Messages filtered during the current focus session and sent to AI for summarization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messages",
+    "context"
+  ],
+  "properties": {
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "external-message.schema.json"
+      }
+    },
+    "context": {
+      "$ref": "session-context.schema.json"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -93,3 +93,14 @@ class TaskDecision(BaseModel):
     )
 
     reason: str = Field(min_length=1)
+
+class MessageSummaryRequest(BaseModel):
+    messages: list[ExternalMessage]
+    context: SessionContext
+    metadata: dict | None = None
+
+
+class MessageSummaryResponse(BaseModel):
+    messageCount: int = Field(ge=0)
+    summary: str = Field(min_length=1)
+    metadata: dict | None = None
