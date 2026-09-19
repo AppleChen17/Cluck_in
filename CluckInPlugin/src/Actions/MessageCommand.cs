@@ -2,12 +2,12 @@ namespace Loupedeck.CluckInPlugin
 {
     using System;
 
-    public class CounterCommand : PluginDynamicCommand
+    public class MessageCommand : PluginDynamicCommand
     {
-        public CounterCommand()
+        public MessageCommand()
             : base(
-                displayName: "Mode",
-                description: "Switch between Work and Idle mode",
+                displayName: "Messages / Feed",
+                description: "Context-sensitive message or pet action",
                 groupName: "CluckIn")
         {
             MainController.ModeChanged += this.OnModeChanged;
@@ -15,7 +15,7 @@ namespace Loupedeck.CluckInPlugin
 
         protected override void RunCommand(String actionParameter)
         {
-            MainController.HandleKeyEvent(1);
+            MainController.HandleKeyEvent(2);
         }
 
         protected override String GetCommandDisplayName(
@@ -23,8 +23,8 @@ namespace Loupedeck.CluckInPlugin
             PluginImageSize imageSize)
         {
             return MainController.CurrentMode == CluckInMode.Focus
-                ? "WORK"
-                : "IDLE";
+                ? "Messages"
+                : "Feed";
         }
 
         private void OnModeChanged()
