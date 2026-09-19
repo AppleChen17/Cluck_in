@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/external-message.schema.json",
+  "title": "ExternalMessage",
+  "description": "Normalized communication message without provider-specific API structures.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "sender",
+    "content",
+    "timestamp",
+    "unread"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable opaque identifier, unique across message sources. Adapters should namespace provider identifiers."
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "gmail",
+        "slack"
+      ]
+    },
+    "sender": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable sender label, not a provider user object."
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "content": {
+      "type": "string",
+      "description": "Normalized plain text. May be empty for a message without text."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the message was sent, not the time it was fetched."
+    },
+    "unread": {
+      "type": "boolean"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}

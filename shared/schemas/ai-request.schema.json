@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/ai-request.schema.json",
+  "title": "AIRequest",
+  "description": "A single normalized message and working-context snapshot sent to AI for classification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "message",
+    "context"
+  ],
+  "properties": {
+    "message": {
+      "$ref": "external-message.schema.json"
+    },
+    "context": {
+      "$ref": "session-context.schema.json"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}

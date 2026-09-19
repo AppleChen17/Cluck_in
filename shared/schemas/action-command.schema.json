@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/action-command.schema.json",
+  "title": "ActionCommand",
+  "description": "App-issued instruction for the actions module; not an execution result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "SHOW_NOTIFICATION",
+        "OPEN_APP",
+        "OPEN_URL",
+        "HOLD_MESSAGE",
+        "RELEASE_MESSAGES",
+        "START_FOCUS",
+        "END_FOCUS"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the app issued the command."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Type-specific parameters. An empty object is valid; detailed payload validation is deferred."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/session-context.schema.json",
+  "title": "SessionContext",
+  "description": "App-owned working context supplied to AI as a snapshot. Only mode and currentTask are required.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "currentTask"
+  ],
+  "properties": {
+    "mode": {
+      "$ref": "#/$defs/mode"
+    },
+    "currentTask": {
+      "$ref": "#/$defs/currentTask"
+    },
+    "focusStartedAt": {
+      "$ref": "#/$defs/focusStartedAt"
+    },
+    "focusDurationSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Planned total focus duration in seconds; not elapsed or remaining time. Omitted means unspecified."
+    },
+    "allowedApps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "description": "Normalized app labels. Omitted means unspecified; [] means no explicit entries."
+    },
+    "blockedApps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "description": "Normalized app labels. Omitted means unspecified; [] means no explicit entries."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  },
+  "$defs": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "focus",
+        "auto"
+      ]
+    },
+    "currentTask": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Human-readable task text; null means no task selected."
+    },
+    "focusStartedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Original focus-session start time; null means no focus session. Omission means timing is not supplied."
+    }
+  }
+}

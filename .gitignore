@@ -1,25 +1,28 @@
-# .NET
+# .NET build output and IDE state
 **/bin/
 **/obj/
-*.user
-
-# Logitech package
-*.lplug4
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
-# Secrets
-.env
-.env.*
-
-# IDE
 .vs/
 .vscode/
+*.user
+*.lplug4
+*.suo
+TestResults/
 
-# OS
-Thumbs.db
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Local secrets and OS files
+.env
+.env.*
+!.env.example
 .DS_Store
+Thumbs.db

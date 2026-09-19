@@ -1,0 +1,13 @@
+{
+  "id": "google-calendar:event-001",
+  "source": "google-calendar",
+  "title": "Cluck In demo rehearsal",
+  "description": "Walk through the hackathon demo.",
+  "startTime": "2026-09-19T12:00:00+08:00",
+  "endTime": "2026-09-19T12:30:00+08:00",
+  "location": "Team room",
+  "attendees": [
+    "Alice",
+    "Bob"
+  ]
+}

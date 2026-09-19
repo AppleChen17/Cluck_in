@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/app-state.schema.json",
+  "title": "AppState",
+  "description": "App-owned dashboard snapshot. Message and event fields are counts, not collections.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "currentTask",
+    "focusRemainingSeconds",
+    "heldMessages",
+    "urgentMessages",
+    "upcomingEvents",
+    "chicken",
+    "lastUpdatedAt"
+  ],
+  "properties": {
+    "mode": {
+      "$ref": "session-context.schema.json#/$defs/mode"
+    },
+    "currentTask": {
+      "$ref": "session-context.schema.json#/$defs/currentTask"
+    },
+    "focusStartedAt": {
+      "$ref": "session-context.schema.json#/$defs/focusStartedAt"
+    },
+    "focusRemainingSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "App-calculated remaining focus time. Zero when no timer is active; paused timers retain their remaining time."
+    },
+    "heldMessages": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of messages currently held."
+    },
+    "urgentMessages": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of urgent messages currently awaiting attention."
+    },
+    "upcomingEvents": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of events in the app-selected upcoming window. The window is not defined by this schema."
+    },
+    "chicken": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mood",
+        "energy"
+      ],
+      "properties": {
+        "mood": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "focused",
+            "happy",
+            "tired"
+          ],
+          "description": "Initial display vocabulary; not an automatic mapping from session mode."
+        },
+        "energy": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Display energy from 0 (empty) to 100 (full)."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+        }
+      }
+    },
+    "lastUpdatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the app last updated this snapshot."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}

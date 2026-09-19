@@ -1,0 +1,13 @@
+{
+  "mode": "focus",
+  "currentTask": "Finish Cluck In prototype",
+  "focusStartedAt": "2026-09-19T11:30:00+08:00",
+  "focusDurationSeconds": 1500,
+  "allowedApps": [
+    "Visual Studio Code",
+    "Chrome"
+  ],
+  "blockedApps": [
+    "Instagram"
+  ]
+}

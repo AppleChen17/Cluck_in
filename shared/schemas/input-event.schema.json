@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/input-event.schema.json",
+  "title": "InputEvent",
+  "description": "User or system input delivered to the app orchestrator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "source",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "START_FOCUS",
+        "STOP_FOCUS",
+        "PAUSE_FOCUS",
+        "RESUME_FOCUS",
+        "CHANGE_MODE",
+        "SELECT_TASK",
+        "FEED_CHICKEN",
+        "PET_CHICKEN"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "logitech",
+        "web",
+        "system"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Type-specific parameters. An empty object is valid; detailed payload validation is deferred."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+    }
+  }
+}
