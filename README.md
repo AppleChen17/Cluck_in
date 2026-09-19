@@ -78,3 +78,14 @@ AI Assist state control, semantic event routing, and local Python HTTP integrati
 See [`CluckInPlugin/INTEGRATION.md`](CluckInPlugin/INTEGRATION.md) for the current interface,
 testing instructions, key mappings, and integration status.
 '@ | Add-Content .\README.md
+
+## Logitech MX Creative Console
+
+The Logitech integration is under `CluckInPlugin/`.
+
+See `CluckInPlugin/INTEGRATION.md` for:
+- key mappings
+- timer controls
+- InputEvent format
+- local testing
+- current integration status
