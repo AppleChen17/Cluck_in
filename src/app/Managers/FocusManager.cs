@@ -3,8 +3,12 @@ using CluckIn.App.Models;
 
 namespace CluckIn.App.Managers;
 
-public sealed class FocusManager : IFocusManager
+public sealed class FocusManager(ITimerManager? timerManager = null) : IFocusManager
 {
+    private readonly ITimerManager _timer = timerManager ?? new TimerManager();
+    public void StartFocus(TimeSpan duration) => _timer.Start(duration);
+    public void StopFocus() => _timer.Stop();
+
     public FocusEvaluation Evaluate(DesktopContext context, WorkspaceProfile workspace)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -20,6 +24,18 @@ public sealed class FocusManager : IFocusManager
         match = MatchKeyword(workspace.BlockedWindowKeywords, window.WindowTitle);
         if (match is not null)
             return Result(false, $"Window matches blocked keyword: {match}", match);
+
+        if (context.Browser is not null && workspace.AllowedDomains.Count > 0)
+        {
+            if (!Uri.TryCreate(context.Browser.Url, UriKind.Absolute, out var page))
+                return new() { Reason = "Browser URL unavailable; domain whitelist cannot be evaluated." };
+            var domain = workspace.AllowedDomains.FirstOrDefault(d =>
+                page.Host.Equals(d, StringComparison.OrdinalIgnoreCase) ||
+                page.Host.EndsWith("." + d, StringComparison.OrdinalIgnoreCase));
+            return domain is not null
+                ? Result(true, $"Domain is allowed: {domain}")
+                : Result(false, $"Domain is not allowed: {page.Host}", page.Host);
+        }
 
         match = workspace.AllowedApplications.FirstOrDefault(a =>
             !string.IsNullOrWhiteSpace(a) && NormalizeApplication(a) == process);

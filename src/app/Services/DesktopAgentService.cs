@@ -9,7 +9,9 @@ public sealed class DesktopAgentService(
     IContextManager contextManager,
     IWorkspaceManager workspaceManager,
     IFocusManager focusManager,
-    ITimerManager timerManager)
+    ITimerManager timerManager,
+    ISessionManager? sessionManager = null,
+    IWhitelistManager? whitelistManager = null)
 {
     public Task<DesktopContext> GetContextAsync() => contextManager.GetCurrentContextAsync();
 
@@ -20,7 +22,9 @@ public sealed class DesktopAgentService(
         if (!context.FocusModeEnabled)
             return new() { Reason = "Focus Mode is disabled." };
 
-        var workspace = workspaceManager.GetWorkspaces().FirstOrDefault(w => w.Id == context.WorkspaceId);
+        var workspace = sessionManager?.CurrentTask?.Id == context.WorkspaceId && sessionManager?.CurrentTask is not null
+            ? whitelistManager?.CurrentWhitelist
+            : workspaceManager.GetWorkspaces().FirstOrDefault(w => w.Id == context.WorkspaceId);
         return workspace is null
             ? new() { Reason = "No active workspace." }
             : focusManager.Evaluate(context, workspace);
@@ -29,13 +33,18 @@ public sealed class DesktopAgentService(
     public IReadOnlyList<WorkspaceProfile> GetWorkspaces() => workspaceManager.GetWorkspaces();
     public WorkspaceProfile? GetActiveWorkspace() => workspaceManager.GetActiveWorkspace();
     public void AddWorkspace(WorkspaceProfile workspace) => workspaceManager.AddWorkspace(workspace);
-    public void SetActiveWorkspace(string workspaceId) => workspaceManager.SetActiveWorkspace(workspaceId);
+    public void SetActiveWorkspace(string workspaceId)
+    {
+        workspaceManager.SetActiveWorkspace(workspaceId);
+        sessionManager?.ClearCurrentTask();
+    }
 
     public void StartFocus(string workspaceId, TimeSpan duration)
     {
         if (duration <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(duration), "Duration must be positive.");
         workspaceManager.SetActiveWorkspace(workspaceId);
+        sessionManager?.ClearCurrentTask();
         timerManager.Start(duration);
     }
 

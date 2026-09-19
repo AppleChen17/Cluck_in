@@ -91,18 +91,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         try
         {
             if (_closing) return;
-            // Foreground window interop is synchronous. Keep it off the dispatcher;
-            // serialize all service calls because its managers are intentionally single-loop.
-            var result = await Task.Run(async () =>
-            {
-                action?.Invoke();
-                var context = await _agent.GetContextAsync();
-                var evaluation = await _agent.EvaluateFocusAsync(context);
-                return (context, evaluation);
-            });
+            // Share the dispatcher with Task API state changes. ContextManager samples
+            // the foreground window in the background without moving timer mutations there.
+            action?.Invoke();
+            var context = await _agent.GetContextAsync();
+            var evaluation = await _agent.EvaluateFocusAsync(context);
             if (_closing) return;
-            _context = result.context;
-            _evaluation = result.evaluation;
+            _context = context;
+            _evaluation = evaluation;
             _selectedWorkspace = Workspaces.FirstOrDefault(w => w.Id == _context.WorkspaceId);
             _errorMessage = null;
             OnPropertyChanged(string.Empty);
@@ -126,7 +122,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _closing = true;
         NotifyCommands();
         await _serviceGate.WaitAsync();
-        try { await Task.Run(_agent.StopFocus); }
+        try { _agent.StopFocus(); }
         finally { _serviceGate.Release(); }
     }
 

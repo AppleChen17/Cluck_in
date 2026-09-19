@@ -92,6 +92,7 @@ agent.StopFocus();
 Check(!(await agent.GetContextAsync()).FocusModeEnabled && timer.GetCurrentSession().Status == FocusSessionStatus.Stopped, "Stop disables mode");
 Console.WriteLine($"Passed {assertions} Desktop Agent checks.");
 await ViewModelChecks.RunAsync();
+await TaskChecks.RunAsync();
 if (args.Contains("--ui")) await WpfLaunchChecks.RunAsync();
 
 sealed class FakeWindowManager : IWindowManager

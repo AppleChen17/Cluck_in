@@ -45,6 +45,7 @@ public sealed class WorkspaceManager : IWorkspaceManager
         _workspaces.Add(workspace with
         {
             AllowedApplications = Array.AsReadOnly(workspace.AllowedApplications.ToArray()),
+            AllowedDomains = Array.AsReadOnly(workspace.AllowedDomains.ToArray()),
             AllowedWindowKeywords = Array.AsReadOnly(workspace.AllowedWindowKeywords.ToArray()),
             BlockedApplications = Array.AsReadOnly(workspace.BlockedApplications.ToArray()),
             BlockedWindowKeywords = Array.AsReadOnly(workspace.BlockedWindowKeywords.ToArray())
