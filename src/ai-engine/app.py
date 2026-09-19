@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 
-from schemas import AIRequest, AIDecision
+from schemas import (
+    AIRequest,
+    AIDecision,
+    TaskAnalyzeRequest,
+    TaskDecision,
+)
 from services.ollama_provider import OllamaProvider
-from services.message_service import MessageService
+from services.ai_service import AIService
 
 
 app = FastAPI(
@@ -11,7 +16,7 @@ app = FastAPI(
 )
 
 provider = OllamaProvider()
-message_service = MessageService(provider)
+ai_service = AIService(provider)
 
 
 @app.get("/health")
@@ -29,4 +34,13 @@ def health():
 def analyze_message(
     request: AIRequest
 ):
-    return message_service.analyze_message(request)
+    return ai_service.analyze_message(request)
+
+@app.post(
+    "/analyze-task",
+    response_model=TaskDecision
+)
+def analyze_task(
+    request: TaskAnalyzeRequest
+):
+    return ai_service.analyze_task(request)

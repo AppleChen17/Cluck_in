@@ -1,5 +1,4 @@
-from abc import ABC, abstractmethod
-
+from services.llm_provider import LLMProvider
 from schemas import (
     AIRequest,
     AIDecision,
@@ -8,18 +7,19 @@ from schemas import (
 )
 
 
-class LLMProvider(ABC):
+class AIService:
 
-    @abstractmethod
+    def __init__(self, provider: LLMProvider):
+        self.provider = provider
+
     def analyze_message(
         self,
         request: AIRequest
     ) -> AIDecision:
-        pass
-
-    @abstractmethod
+        return self.provider.analyze_message(request)
+    
     def analyze_task(
         self,
         request: TaskAnalyzeRequest
     ) -> TaskDecision:
-        pass
+        return self.provider.analyze_task(request)

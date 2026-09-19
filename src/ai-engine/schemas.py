@@ -62,3 +62,30 @@ class AIDecision(BaseModel):
     reason: str = Field(min_length=1)
 
     metadata: dict | None = None
+
+class TaskTarget(BaseModel):
+    type: Literal["app", "web"]
+    name: str
+    title: str | None = None
+    url: str | None = None
+    identifier: str | None = None
+
+
+class TaskAnalyzeRequest(BaseModel):
+    target: TaskTarget
+    context: SessionContext
+
+
+class TaskDecision(BaseModel):
+    decision: Literal[
+        "allow",
+        "warn",
+        "block",
+    ]
+
+    relevance: float = Field(
+        ge=0,
+        le=1,
+    )
+
+    reason: str = Field(min_length=1)
