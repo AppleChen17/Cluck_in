@@ -12,14 +12,14 @@ public sealed class ContextManager(
 {
     public async Task<DesktopContext> GetCurrentContextAsync()
     {
-        // Only foreground-window sampling leaves the application's dispatcher.
         var window = await Task.Run(windowManager.GetActiveWindowAsync);
+        var browser = await browserManager.GetBrowserContextAsync(window);
         var workspace = workspaceManager.GetActiveWorkspace();
         var session = timerManager.GetCurrentSession();
         return new()
         {
             ActiveWindow = window,
-            Browser = browserManager.GetBrowserContext(window),
+            Browser = browser,
             WorkspaceId = sessionManager?.CurrentTask?.Id ?? workspace?.Id,
             WorkspaceName = sessionManager?.CurrentTask?.Name ?? workspace?.Name,
             FocusSession = session,

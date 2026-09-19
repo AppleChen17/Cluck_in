@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import WorkspaceRules from './components/WorkspaceRules';
 import TaskLauncher from './components/TaskLauncher';
+import ChickenIntervention from './components/ChickenIntervention';
 import './workspace-rules.css';
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
   const editingRules = route === '#/workspace-rules';
   return (
     <>
+      <ChickenIntervention />
       <nav className="app-nav" aria-label="Main navigation">
         <a href="#/dashboard" aria-current={!editingRules ? 'page' : undefined}>Dashboard</a>
         <a href="#/workspace-rules" aria-current={editingRules ? 'page' : undefined}>Workspace Rules</a>

@@ -39,7 +39,7 @@ static class ViewModelChecks
         var workspaces = new WorkspaceManager();
         workspaces.AddWorkspace(new() { Id = "writing", Name = "Writing", AllowedApplications = ["notepad"] });
         var timer = new TimerManager();
-        var service = new DesktopAgentService(new ContextManager(windows, new BrowserManager(), workspaces, timer), workspaces, new FocusManager(), timer);
+        var service = new DesktopAgentService(new ContextManager(windows, new BrowserManager(new TestBrowserUrlReader()), workspaces, timer), workspaces, new FocusManager(timer), timer);
         var vm = new MainViewModel(service);
         var uiThread = Environment.CurrentManagedThreadId;
         var notificationsOnUi = true;
@@ -73,7 +73,7 @@ static class ViewModelChecks
         windows.Process = "unknown";
         windows.Title = "Unknown activity";
         await vm.RefreshAsync();
-        Check(vm.FocusStatus == "Neutral" && vm.BrowserPageTitle == "—", "Unknown activity and absent browser");
+        Check(vm.FocusStatus == "Distracted" && vm.BrowserPageTitle == "—", "Unknown activity and absent browser");
         await ExecuteAsync(vm.ChangeWorkspaceCommand, vm.Workspaces[1]);
         Check(vm.WorkspaceName == "Writing" && service.GetActiveWorkspace()?.Id == "writing", "Workspace committed through service");
         windows.Process = "notepad";

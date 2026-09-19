@@ -54,6 +54,7 @@ public static class TaskApiHost
                 context.Response.StatusCode = exception switch
                 {
                     KeyNotFoundException => 404,
+                    InvalidOperationException => 409,
                     ArgumentException or BadHttpRequestException => 400,
                     _ => 500
                 };
@@ -87,6 +88,10 @@ public static class TaskApiHost
         });
         app.MapGet("/api/session", async (ISessionManager session, ITimerManager timer) =>
             await dispatcher.InvokeAsync(() => Results.Ok(new { currentTask = session.CurrentTask, focusSession = timer.GetCurrentSession() })));
+        app.MapGet("/api/intervention", async (DesktopAgentService agent) =>
+            await dispatcher.InvokeAsync(() => Results.Ok(agent.Intervention)));
+        app.MapPost("/api/intervention/action", async (InterventionActionRequest request, DesktopAgentService agent) =>
+            await (await dispatcher.InvokeAsync(async () => Results.Ok(await agent.HandleInterventionAsync(request)))));
         return app;
     }
 }
