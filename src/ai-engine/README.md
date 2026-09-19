@@ -65,6 +65,7 @@ The AI Engine currently provides:
 
 - Message analysis through `POST /analyze-message`
 - Task and application access analysis through `POST /analyze-task`
+- Filtered message summarization through `POST /summarize-messages`
 
 For complete request and response formats, refer to [API.md](./docs/API.md).
 

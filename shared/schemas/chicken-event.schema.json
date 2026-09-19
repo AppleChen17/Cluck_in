@@ -5,7 +5,9 @@
   "description": "POST /event body. Main sends this; response is ChickenView.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type"],
+  "required": [
+    "type"
+  ],
   "properties": {
     "type": {
       "type": "string",
@@ -22,7 +24,8 @@
         "PET_CHICKEN",
         "FEED_CHICKEN",
         "SET_MOOD",
-        "SET_FEED"
+        "SET_FEED",
+        "RECORD_FOCUS"
       ]
     },
     "payload": {
@@ -31,10 +34,59 @@
       "properties": {
         "mood": {
           "type": "string",
-          "enum": ["idle", "start", "focused", "thinking", "feed", "pet", "paused", "tired"]
+          "enum": [
+            "idle",
+            "start",
+            "focused",
+            "thinking",
+            "feed",
+            "pet",
+            "paused",
+            "tired"
+          ]
         },
-        "count": { "type": "integer", "minimum": 0 }
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed": {
+          "type": "boolean"
+        }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "RECORD_FOCUS"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "required": [
+              "sessionId",
+              "seconds",
+              "completed"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

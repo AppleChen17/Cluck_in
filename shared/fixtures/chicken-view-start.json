@@ -9,5 +9,8 @@
   "deskEmpty": "desk_empty.png",
   "houseIcon": "",
   "houseFps": 0,
-  "feedCount": 0
+  "feedCount": 0,
+  "patCount": 0,
+  "successfulFeedCount": 0,
+  "totalFocusSeconds": 0
 }

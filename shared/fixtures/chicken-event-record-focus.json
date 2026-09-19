@@ -1,0 +1,8 @@
+{
+  "type": "RECORD_FOCUS",
+  "payload": {
+    "sessionId": "example-session",
+    "seconds": 1500,
+    "completed": true
+  }
+}

@@ -1,4 +1,4 @@
-namespace Loupedeck.CluckInPlugin
+﻿namespace Loupedeck.CluckInPlugin
 {
     using System;
 
@@ -7,7 +7,7 @@ namespace Loupedeck.CluckInPlugin
         public CounterCommand()
             : base(
                 displayName: "Mode",
-                description: "Switch between Work and Idle mode",
+                description: "Switch between Focus and Idle mode",
                 groupName: "CluckIn")
         {
             MainController.ModeChanged += this.OnModeChanged;
@@ -23,7 +23,7 @@ namespace Loupedeck.CluckInPlugin
             PluginImageSize imageSize)
         {
             return MainController.CurrentMode == CluckInMode.Focus
-                ? "WORK"
+                ? "FOCUS"
                 : "IDLE";
         }
 

@@ -25,6 +25,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="SkiaSharp">
+      <HintPath>$(PluginApiDir)SkiaSharp.dll</HintPath>
+    </Reference>
     <Reference Include="PluginApi">
       <HintPath>$(PluginApiDir)PluginApi.dll</HintPath>
     </Reference>
