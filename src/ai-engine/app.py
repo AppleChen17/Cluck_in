@@ -1,22 +1,16 @@
 from fastapi import FastAPI
 
-from schemas import (
-    AnalyzeMessageRequest,
-    AnalyzeMessageResponse,
-    DraftReplyRequest,
-    DraftReplyResponse,
-)
-
-from services.mock_provider import MockProvider
+from schemas import AIRequest, AIDecision
+from services.ollama_provider import OllamaProvider
 from services.message_service import MessageService
 
 
 app = FastAPI(
     title="Focus Chick AI Engine",
-    version="0.1.0"
+    version="0.2.0"
 )
 
-provider = MockProvider()
+provider = OllamaProvider()
 message_service = MessageService(provider)
 
 
@@ -30,19 +24,9 @@ def health():
 
 @app.post(
     "/analyze-message",
-    response_model=AnalyzeMessageResponse
+    response_model=AIDecision
 )
 def analyze_message(
-    request: AnalyzeMessageRequest
+    request: AIRequest
 ):
     return message_service.analyze_message(request)
-
-
-@app.post(
-    "/draft-reply",
-    response_model=DraftReplyResponse
-)
-def draft_reply(
-    request: DraftReplyRequest
-):
-    return message_service.draft_reply(request)
