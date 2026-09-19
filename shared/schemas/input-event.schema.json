@@ -1,51 +1,297 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cluck-in.example/schemas/v1/input-event.schema.json",
-  "title": "InputEvent",
-  "description": "User or system input delivered to the app orchestrator.",
+  "$id": "https://cluckin.local/schemas/input-event.schema.json",
+  "title": "CluckIn Logitech Input Event",
+  "description": "HTTP input-event contract emitted by the Logitech plugin.",
   "type": "object",
-  "additionalProperties": false,
   "required": [
     "type",
     "source",
     "timestamp",
-    "payload"
+    "payload",
+    "metadata"
   ],
+  "additionalProperties": false,
   "properties": {
     "type": {
-      "type": "string",
-      "enum": [
-        "START_FOCUS",
-        "STOP_FOCUS",
-        "PAUSE_FOCUS",
-        "RESUME_FOCUS",
-        "CHANGE_MODE",
-        "SELECT_TASK",
-        "FEED_CHICKEN",
-        "PET_CHICKEN"
-      ]
+      "type": "string"
     },
     "source": {
-      "type": "string",
-      "enum": [
-        "logitech",
-        "web",
-        "system"
-      ]
+      "const": "logitech"
     },
     "timestamp": {
       "type": "string",
       "format": "date-time"
     },
     "payload": {
-      "type": "object",
-      "additionalProperties": true,
-      "description": "Type-specific parameters. An empty object is valid; detailed payload validation is deferred."
+      "type": "object"
     },
     "metadata": {
       "type": "object",
-      "additionalProperties": true,
-      "description": "Optional normalized extension fields. Do not include raw provider API objects or credentials."
+      "required": [
+        "keyId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keyId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        }
+      }
     }
-  }
+  },
+  "oneOf": [
+    {
+      "title": "Change mode",
+      "properties": {
+        "type": {
+          "const": "CHANGE_MODE"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "focus",
+                "idle"
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Feed chicken",
+      "properties": {
+        "type": {
+          "const": "FEED_CHICKEN"
+        },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Pet chicken",
+      "properties": {
+        "type": {
+          "const": "PET_CHICKEN"
+        },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Set AI assist mode",
+      "properties": {
+        "type": {
+          "const": "SET_AI_ASSIST_MODE"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "suggestion",
+                "on"
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Start focus",
+      "properties": {
+        "type": {
+          "const": "START_FOCUS"
+        },
+        "payload": {
+          "type": "object",
+          "required": [
+            "focusDurationSeconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "focusDurationSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86399
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 5
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Pause focus",
+      "properties": {
+        "type": {
+          "const": "PAUSE_FOCUS"
+        },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 5
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Resume focus",
+      "properties": {
+        "type": {
+          "const": "RESUME_FOCUS"
+        },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 5
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "Stop focus",
+      "properties": {
+        "type": {
+          "const": "STOP_FOCUS"
+        },
+        "payload": {
+          "type": "object",
+          "maxProperties": 0
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "keyId"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "keyId": {
+              "const": 6
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "type": "SET_AI_ASSIST_MODE",
+      "source": "logitech",
+      "timestamp": "2026-09-19T20:00:00+08:00",
+      "payload": {
+        "mode": "suggestion"
+      },
+      "metadata": {
+        "keyId": 3
+      }
+    },
+    {
+      "type": "START_FOCUS",
+      "source": "logitech",
+      "timestamp": "2026-09-19T20:00:00+08:00",
+      "payload": {
+        "focusDurationSeconds": 1500
+      },
+      "metadata": {
+        "keyId": 5
+      }
+    }
+  ]
 }

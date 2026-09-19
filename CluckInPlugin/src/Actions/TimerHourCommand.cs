@@ -1,4 +1,4 @@
-﻿namespace Loupedeck.CluckInPlugin;
+namespace Loupedeck.CluckInPlugin;
 
 using System;
 
@@ -6,13 +6,16 @@ public class TimerHourCommand : PluginDynamicCommand{
     public TimerHourCommand()
         : base(
             displayName: "Timer Hour",
-            description: "Select and display focus timer hours",
+            description: "Select and display focus timer hr",
             groupName: "CluckIn")
     {
-        MainController.FocusTimerChanged += this.OnStateChanged;
+        MainController.FocusTimerChanged +=
+            this.OnStateChanged;
     }
 
-    protected override void RunCommand(String actionParameter){
+    protected override void RunCommand(
+        String actionParameter)
+    {
         MainController.HandleKeyEvent(7);
     }
 
@@ -21,11 +24,12 @@ public class TimerHourCommand : PluginDynamicCommand{
         PluginImageSize imageSize)
     {
         var label =
-            MainController.CurrentFocusTimerField == FocusTimerField.Hours
+            MainController.CurrentFocusTimerField ==
+                FocusTimerField.Hours
                 ? "HR"
                 : "hr";
 
-        return $"{MainController.SelectedFocusHours:00}" +
+        return $"{MainController.DisplayFocusHours:00}" +
                $"{Environment.NewLine}{label}";
     }
 
