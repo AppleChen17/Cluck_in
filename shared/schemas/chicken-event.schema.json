@@ -11,6 +11,10 @@
       "type": "string",
       "enum": [
         "tick",
+        "FOCUS_START",
+        "FOCUS_DEFAULT",
+        "FOCUS_PAUSE",
+        "START",
         "START_FOCUS",
         "STOP_FOCUS",
         "PAUSE_FOCUS",
@@ -27,7 +31,7 @@
       "properties": {
         "mood": {
           "type": "string",
-          "enum": ["idle", "focused", "thinking", "feed", "pet", "paused", "tired"]
+          "enum": ["idle", "start", "focused", "thinking", "feed", "pet", "paused", "tired"]
         },
         "count": { "type": "integer", "minimum": 0 }
       }

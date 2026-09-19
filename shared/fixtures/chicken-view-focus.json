@@ -1,11 +1,11 @@
 {
   "mood": "focused",
   "chicken": "focused_00.png",
-  "fps": 3,
+  "fps": 2,
   "loop": true,
   "frameDir": "src/chicken/frames",
-  "displayKey": 5,
-  "nestIcon": "nest_icon.png",
+  "displayKey": 6,
+  "nestIcon": "focused_00.png",
   "deskEmpty": "desk_empty.png",
   "feedCount": 1
 }

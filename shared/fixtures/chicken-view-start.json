@@ -1,6 +1,6 @@
 {
-  "mood": "paused",
-  "chicken": "paused_00.png",
+  "mood": "start",
+  "chicken": "start_00.png",
   "fps": 3,
   "loop": true,
   "frameDir": "src/chicken/frames",

@@ -1,4 +1,4 @@
 {
-  "type": "START_FOCUS",
+  "type": "FOCUS_DEFAULT",
   "payload": {}
 }
