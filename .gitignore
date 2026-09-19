@@ -1,0 +1,25 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Logitech package
+*.lplug4
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+
+# IDE
+.vs/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
