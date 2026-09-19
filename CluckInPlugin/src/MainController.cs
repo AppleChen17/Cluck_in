@@ -422,7 +422,16 @@ public static class MainController{
     }
 
     private static void HandleKey4(){
-        PluginLog.Info("Task selection opened");
+        RequestAction(
+            4,
+            CluckInAction.SelectTask
+        );
+
+        SendInputEvent(
+            "SELECT_TASK",
+            new Dictionary<String, Object>(),
+            4
+        );
     }
 
     private static void HandleFocusControlKey(){

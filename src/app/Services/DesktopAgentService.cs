@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using CluckIn.App.Orchestration;
 using Microsoft.Extensions.Logging;
@@ -70,11 +71,25 @@ public sealed class DesktopAgentService(
             case "PAUSE_FOCUS": PauseFocus(); break;
             case "RESUME_FOCUS": ResumeFocus(); break;
             case "STOP_FOCUS": StopFocus(); break;
+            case "SELECT_TASK":
+                OpenTaskSelection();
+                break;
             case "SHOW_MESSAGES":
                 await HandlePatAsync();
                 break;
             default: throw new ArgumentException($"Unsupported Main Program input: {input.Type}");
         }
+    }
+
+    private static void OpenTaskSelection(){
+        var baseUrl = Environment.GetEnvironmentVariable("CLUCKIN_WEB_URL");
+        if(String.IsNullOrWhiteSpace(baseUrl)){
+            baseUrl = "http://127.0.0.1:5173";
+        }
+        var url = baseUrl.TrimEnd('/') + "/#/dashboard";
+        Process.Start(new ProcessStartInfo(url){
+            UseShellExecute = true
+        });
     }
 
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
