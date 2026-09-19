@@ -4,6 +4,8 @@
   "fps": 3,
   "loop": true,
   "frameDir": "src/chicken/frames",
+  "displayKey": 5,
   "nestIcon": "nest_icon.png",
+  "deskEmpty": "desk_empty.png",
   "feedCount": 1
 }

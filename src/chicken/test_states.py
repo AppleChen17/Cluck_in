@@ -8,6 +8,9 @@ def main() -> None:
     script = [
         ("START_FOCUS", None),
         ("tick", None),
+        ("PAUSE_FOCUS", None),
+        ("tick", None),
+        ("RESUME_FOCUS", None),
         ("PET_CHICKEN", None),
         ("tick", None),
         ("SET_MOOD", {"mood": "thinking"}),

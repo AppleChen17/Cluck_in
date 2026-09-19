@@ -1,11 +1,11 @@
 {
-  "mood": "idle",
-  "chicken": "idle_00.png",
+  "mood": "paused",
+  "chicken": "paused_00.png",
   "fps": 2,
   "loop": true,
   "frameDir": "src/chicken/frames",
-  "displayKey": 5,
-  "nestIcon": "",
+  "displayKey": 6,
+  "nestIcon": "paused_00.png",
   "deskEmpty": "desk_empty.png",
   "feedCount": 0
 }
