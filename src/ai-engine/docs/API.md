@@ -136,6 +136,7 @@ Whitelist and blacklist checks should be performed before sending the request to
   "context": {
     "mode": "focus",
     "currentTask": "Implement AI Engine API",
+    "automationMode": "suggestion",
     "focusStartedAt": "2026-09-19T16:00:00+08:00",
     "focusDurationSeconds": 1500
   }
@@ -163,6 +164,10 @@ Whitelist and blacklist checks should be performed before sending the request to
 - `currentTask`: Current task of the user. Can be `null`.
 - `focusStartedAt`: Start time of the current focus session. Can be `null`.
 - `focusDurationSeconds`: Duration of the focus session in seconds. Can be `null`.
+- `automationMode`: Controls automated reply behavior:
+  - `"on"`: Generate reply content that may be executed automatically by the main program.
+  - `"suggestion"`: Generate reply content for user approval.
+  - `"off"`: Do not generate reply content.
 - `allowedApps`: Optional list of allowed applications.
 - `blockedApps`: Optional list of blocked applications.
 - `metadata`: Optional additional context.
@@ -173,7 +178,9 @@ Whitelist and blacklist checks should be performed before sending the request to
 {
   "decision": "allow",
   "relevance": 0.9,
-  "reason": "目標是 FastAPI 文件，與目前正在進行的 AI Engine API 實作高度相關。"
+  "reason": "目標是 FastAPI 文件，與目前正在進行的 AI Engine API 實作高度相關。",
+  "requiresReply": true,
+  "replyDraft": "可以，我今晚八點會到，謝謝通知！"
 }
 ```
 
@@ -184,6 +191,8 @@ Whitelist and blacklist checks should be performed before sending the request to
   - `"warn"`: The target may be useful, but its purpose is unclear.
   - `"block"`: The target is clearly unrelated to the current task during focus mode.
 - `relevance`: Relevance between the target and the current task, from `0.0` to `1.0`.
+- `requiresReply`: Whether the incoming message requires a reply.
+- `replyDraft`: Generated reply content. This is `null` when no reply is required or when `automationMode` is `"off"`.
 - `reason`: Short explanation of the AI decision.
 
 When `mode` is `"idle"`, `"allow"` is normally returned.

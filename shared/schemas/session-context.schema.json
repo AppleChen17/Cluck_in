@@ -24,6 +24,15 @@
       "minimum": 0,
       "description": "Planned total focus duration in seconds; not elapsed or remaining time. Omitted means unspecified."
     },
+    "automationMode": {
+      "type": "string",
+      "enum": [
+        "on",
+        "suggestion",
+        "off"
+      ],
+      "description": "Automation behavior for messages. on: generated actions may be executed automatically; suggestion: generated content is shown to the user for approval; off: no automated reply content is generated."
+    },
     "allowedApps": {
       "type": "array",
       "items": {

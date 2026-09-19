@@ -3,5 +3,7 @@
   "decision": "urgent",
   "relevance": 0.93,
   "urgency": 0.88,
+  "requiresReply": true,
+  "replyDraft": "可以，我今晚八點會到，謝謝通知！",
   "reason": "The message reports a build failure related to the current task."
 }
