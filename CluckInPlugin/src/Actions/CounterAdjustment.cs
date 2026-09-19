@@ -1,36 +1,61 @@
-namespace Loupedeck.CluckInPlugin
+﻿namespace Loupedeck.CluckInPlugin
 {
     using System;
 
-    // This class implements an example adjustment that counts the rotation ticks of a dial.
-
     public class CounterAdjustment : PluginDynamicAdjustment
     {
-        // This variable holds the current value of the counter.
-        private Int32 _counter = 0;
+        private const Int32 TicksPerStep = 4;
 
-        // Initializes the adjustment class.
-        // When `hasReset` is set to true, a reset command is automatically created for this adjustment.
+        private Int32 _pendingTicks = 0;
+
+        private FocusTimerField _lastField =
+            MainController.CurrentFocusTimerField;
+
         public CounterAdjustment()
-            : base(displayName: "Tick Counter", description: "Counts rotation ticks", groupName: "Adjustments", hasReset: true)
+            : base(
+                displayName: "Focus Duration",
+                description: "Adjust the selected timer field",
+                groupName: "CluckIn",
+                hasReset: true)
         {
         }
 
-        // This method is called when the adjustment is executed.
-        protected override void ApplyAdjustment(String actionParameter, Int32 diff)
+        protected override void ApplyAdjustment(
+            String actionParameter,
+            Int32 diff)
         {
-            this._counter += diff; // Increase or decrease the counter by the number of ticks.
-            this.AdjustmentValueChanged(); // Notify the plugin service that the adjustment value has changed.
+            if(this._lastField != MainController.CurrentFocusTimerField){
+                this._pendingTicks = 0;
+                this._lastField = MainController.CurrentFocusTimerField;
+            }
+
+            this._pendingTicks += diff;
+
+            var steps = this._pendingTicks / TicksPerStep;
+
+            if(steps == 0){
+                return;
+            }
+
+            this._pendingTicks %= TicksPerStep;
+
+            MainController.AdjustFocusDuration(steps);
+
+            this.AdjustmentValueChanged();
         }
 
-        // This method is called when the reset command related to the adjustment is executed.
         protected override void RunCommand(String actionParameter)
         {
-            this._counter = 0; // Reset the counter.
-            this.AdjustmentValueChanged(); // Notify the plugin service that the adjustment value has changed.
+            MainController.HandleKeyEvent(5);
+
+            this.AdjustmentValueChanged();
         }
 
-        // Returns the adjustment value that is shown next to the dial.
-        protected override String GetAdjustmentValue(String actionParameter) => this._counter.ToString();
+        protected override String GetAdjustmentValue(String actionParameter)
+        {
+            return $"{MainController.SelectedFocusHours:00}:" +
+                   $"{MainController.SelectedFocusMinutes:00}:" +
+                   $"{MainController.SelectedFocusSeconds:00}";
+        }
     }
 }

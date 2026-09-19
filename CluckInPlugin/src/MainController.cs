@@ -1,16 +1,41 @@
-namespace Loupedeck.CluckInPlugin;
+﻿namespace Loupedeck.CluckInPlugin;
 
 using System;
 using System.Collections.Generic;
 
 public static class MainController{
-    public static CluckInMode CurrentMode { get; private set; } = CluckInMode.Focus;
+    private const int DefaultFocusHours = 0;
+    private const int DefaultFocusMinutes = 25;
+    private const int DefaultFocusSeconds = 0;
 
-    public static AIAssistMode CurrentAIAssistMode { get; private set; } =
+    public static CluckInMode CurrentMode {get; private set;} = CluckInMode.Focus;
+
+    public static AIAssistMode CurrentAIAssistMode {get; private set;} =
         AIAssistMode.Off;
+
+    public static FocusTimerControlState CurrentFocusTimerState {get; private set;} =
+        FocusTimerControlState.Ready;
+
+    public static FocusTimerField CurrentFocusTimerField {get; private set;} =
+        FocusTimerField.Minutes;
+
+    public static int SelectedFocusHours {get; private set;} =
+        DefaultFocusHours;
+
+    public static int SelectedFocusMinutes {get; private set;} =
+        DefaultFocusMinutes;
+
+    public static int SelectedFocusSeconds {get; private set;} =
+        DefaultFocusSeconds;
+
+    public static int SelectedFocusDurationSeconds =>
+        (SelectedFocusHours * 3600) +
+        (SelectedFocusMinutes * 60) +
+        SelectedFocusSeconds;
 
     public static event Action ModeChanged;
     public static event Action AIAssistModeChanged;
+    public static event Action FocusTimerChanged;
     public static event Action<CluckInEvent> ActionRequested;
 
     public static void HandleKeyEvent(int keyId){
@@ -33,10 +58,104 @@ public static class MainController{
                 HandleKey4();
                 break;
 
+            case 5:
+                HandleFocusControlKey();
+                break;
+
+            case 6:
+                HandleFocusStopKey();
+                break;
+
+            case 7:
+                SelectFocusTimerField(FocusTimerField.Hours);
+                break;
+
+            case 8:
+                SelectFocusTimerField(FocusTimerField.Minutes);
+                break;
+
+            case 9:
+                SelectFocusTimerField(FocusTimerField.Seconds);
+                break;
+
             default:
                 PluginLog.Info($"No action assigned to key {keyId}");
                 break;
         }
+    }
+
+    public static void SelectFocusTimerField(FocusTimerField field){
+        CurrentFocusTimerField = field;
+
+        PluginLog.Info($"Focus timer field selected: {field}");
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    public static void AdjustFocusDuration(int diff){
+        if(diff == 0){
+            return;
+        }
+
+        if(CurrentFocusTimerState != FocusTimerControlState.Ready){
+            PluginLog.Info("Focus duration change ignored while timer is active");
+            return;
+        }
+
+        switch(CurrentFocusTimerField){
+            case FocusTimerField.Hours:
+                SelectedFocusHours = Math.Clamp(
+                    SelectedFocusHours + diff,
+                    0,
+                    23
+                );
+                break;
+
+            case FocusTimerField.Minutes:
+                SelectedFocusMinutes = Math.Clamp(
+                    SelectedFocusMinutes + diff,
+                    0,
+                    59
+                );
+                break;
+
+            case FocusTimerField.Seconds:
+                SelectedFocusSeconds = Math.Clamp(
+                    SelectedFocusSeconds + diff,
+                    0,
+                    59
+                );
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(CurrentFocusTimerField)
+                );
+        }
+
+        PluginLog.Info(
+            $"Focus duration changed to {SelectedFocusHours:00}:{SelectedFocusMinutes:00}:{SelectedFocusSeconds:00}"
+        );
+
+        FocusTimerChanged?.Invoke();
+    }
+
+    public static void ResetFocusDuration(){
+        if(CurrentFocusTimerState != FocusTimerControlState.Ready){
+            PluginLog.Info("Focus duration reset ignored while timer is active");
+            return;
+        }
+
+        SelectedFocusHours = DefaultFocusHours;
+        SelectedFocusMinutes = DefaultFocusMinutes;
+        SelectedFocusSeconds = DefaultFocusSeconds;
+        CurrentFocusTimerField = FocusTimerField.Minutes;
+
+        PluginLog.Info(
+            $"Focus duration reset to {SelectedFocusHours:00}:{SelectedFocusMinutes:00}:{SelectedFocusSeconds:00}"
+        );
+
+        FocusTimerChanged?.Invoke();
     }
 
     private static void HandleModeKey(){
@@ -160,6 +279,81 @@ public static class MainController{
 
     private static void HandleKey4(){
         PluginLog.Info("Task selection opened");
+    }
+
+    private static void HandleFocusControlKey(){
+        if(CurrentMode != CluckInMode.Focus){
+            PluginLog.Info("Focus timer control ignored outside Focus mode");
+            return;
+        }
+
+        switch(CurrentFocusTimerState){
+            case FocusTimerControlState.Ready:
+                if(SelectedFocusDurationSeconds <= 0){
+                    PluginLog.Info("Focus timer start ignored because duration is zero");
+                    return;
+                }
+
+                SendInputEvent(
+                    "START_FOCUS",
+                    new Dictionary<string, object>{
+                        ["focusDurationSeconds"] =
+                            SelectedFocusDurationSeconds
+                    },
+                    5
+                );
+
+                SetFocusTimerState(FocusTimerControlState.Running);
+                break;
+
+            case FocusTimerControlState.Running:
+                SendInputEvent(
+                    "PAUSE_FOCUS",
+                    new Dictionary<string, object>(),
+                    5
+                );
+
+                SetFocusTimerState(FocusTimerControlState.Paused);
+                break;
+
+            case FocusTimerControlState.Paused:
+                SendInputEvent(
+                    "RESUME_FOCUS",
+                    new Dictionary<string, object>(),
+                    5
+                );
+
+                SetFocusTimerState(FocusTimerControlState.Running);
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(CurrentFocusTimerState)
+                );
+        }
+    }
+
+    private static void HandleFocusStopKey(){
+        if(CurrentFocusTimerState == FocusTimerControlState.Ready){
+            PluginLog.Info("Focus timer is not active");
+            return;
+        }
+
+        SendInputEvent(
+            "STOP_FOCUS",
+            new Dictionary<string, object>(),
+            6
+        );
+
+        SetFocusTimerState(FocusTimerControlState.Ready);
+    }
+
+    private static void SetFocusTimerState(FocusTimerControlState state){
+        CurrentFocusTimerState = state;
+
+        PluginLog.Info($"Focus timer control state changed to {state}");
+
+        FocusTimerChanged?.Invoke();
     }
 
     private static void RequestAction(
