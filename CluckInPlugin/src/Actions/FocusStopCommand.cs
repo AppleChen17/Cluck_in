@@ -1,4 +1,4 @@
-namespace Loupedeck.CluckInPlugin;
+﻿namespace Loupedeck.CluckInPlugin;
 
 using System;
 
@@ -11,6 +11,7 @@ public class FocusStopCommand : PluginDynamicCommand{
     {
         MainController.ModeChanged += () => this.ActionImageChanged();
         IdleChickenAnimation.StatisticsChanged += this.OnIdleChanged;
+        FocusChickenAnimation.FrameChanged += this.OnFocusFrameChanged;
         MainController.FocusTimerChanged +=
             this.OnStateChanged;
     }
@@ -44,12 +45,22 @@ public class FocusStopCommand : PluginDynamicCommand{
         if(MainController.CurrentMode == CluckInMode.Idle){
             return null; // Native centered statistics text, without a coop image.
         }
-        return ButtonImageRenderer.DrawCoopState(
+        return FocusChickenAnimation.Current?.DrawKey6(
+            imageSize,
             MainController.CurrentFocusTimerState
         );
+    }
+
+    private void OnFocusFrameChanged(){
+        if(MainController.CurrentMode == CluckInMode.Focus){
+            this.ActionImageChanged();
+        }
     }
 
     private void OnStateChanged(){
         this.ActionImageChanged();
     }
 }
+
+
+

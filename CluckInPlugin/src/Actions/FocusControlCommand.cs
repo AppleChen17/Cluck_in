@@ -11,6 +11,7 @@ public class FocusControlCommand : PluginDynamicCommand{
     {
         MainController.ModeChanged += this.OnStateChanged;
         IdleChickenAnimation.FrameChanged += this.OnIdleFrameChanged;
+        FocusChickenAnimation.FrameChanged += this.OnFocusFrameChanged;
         MainController.FocusTimerChanged +=
             this.OnStateChanged;
     }
@@ -46,10 +47,17 @@ public class FocusControlCommand : PluginDynamicCommand{
             return IdleChickenAnimation.Current?.Draw(imageSize);
         }
 
-        return ButtonImageRenderer.DrawDeskState(
+        return FocusChickenAnimation.Current?.DrawKey5(
+            imageSize,
             MainController.CurrentFocusTimerState,
             MainController.FocusProgress
         );
+    }
+
+    private void OnFocusFrameChanged(){
+        if(MainController.CurrentMode == CluckInMode.Focus){
+            this.ActionImageChanged();
+        }
     }
 
     private void OnIdleFrameChanged(){
@@ -62,3 +70,6 @@ public class FocusControlCommand : PluginDynamicCommand{
         this.ActionImageChanged();
     }
 }
+
+
+
