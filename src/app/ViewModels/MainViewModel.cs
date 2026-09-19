@@ -15,6 +15,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _busy;
     private bool _closing;
     private string? _errorMessage;
+    private string? _interventionError;
 
     public MainViewModel(DesktopAgentService agent)
     {
@@ -24,6 +25,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (_selectedWorkspace is not null)
             agent.SetActiveWorkspace(_selectedWorkspace.Id);
 
+        ReturnToWorkCommand = new(_ => RunInterventionAsync(InterventionAction.ReturnToWork),
+            _ => CanInteract && Intervention.IsActive && Intervention.CanReturnToWork);
+        TemporaryAllowCommand = new(_ => RunInterventionAsync(InterventionAction.TemporaryAllow),
+            _ => CanInteract && Intervention.IsActive);
         StartFocusCommand = new(_ => RunAsync(() => _agent.StartFocus(SelectedWorkspace!.Id, TimeSpan.FromMinutes(25))),
             _ => CanInteract && SelectedWorkspace is not null && !IsFocusModeEnabled);
         PauseFocusCommand = new(_ => RunAsync(_agent.PauseFocus),
@@ -49,10 +54,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public string? InterventionErrorMessage => _interventionError;
+    public InterventionState Intervention => _agent.Intervention;
+    public RelayCommand ReturnToWorkCommand { get; }
+    public RelayCommand TemporaryAllowCommand { get; }
     public string WorkspaceName => _context.WorkspaceName ?? _selectedWorkspace?.Name ?? "No workspace";
     public string ActiveApplication => Display(_context.ActiveWindow.ProcessName);
     public string ActiveWindowTitle => Display(_context.ActiveWindow.WindowTitle);
     public string BrowserPageTitle => Display(_context.Browser?.PageTitle);
+    public string BrowserUrl => _context.Browser is null ? "—" : _context.Browser.Url ?? "URL unavailable";
     public string FocusStatus => !_evaluation.IsEvaluated ? "Neutral" : _evaluation.IsFocused ? "Focused" : "Distracted";
     public string FocusReason => _evaluation.Reason;
     public bool IsFocusModeEnabled => _context.FocusModeEnabled;
@@ -117,6 +127,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    private async Task RunInterventionAsync(InterventionAction action)
+    {
+        var id = Intervention.Id;
+        if (id is null || _closing) return;
+        _busy = true;
+        NotifyCommands();
+        await _serviceGate.WaitAsync();
+        try
+        {
+            if (!_closing) await _agent.HandleInterventionAsync(new(id.Value, action));
+            _interventionError = null;
+        }
+        catch (Exception ex) { _interventionError = ex.Message; }
+        finally
+        {
+            _busy = false;
+            _serviceGate.Release();
+            OnPropertyChanged(string.Empty);
+            NotifyCommands();
+        }
+    }
+
     public async Task ShutdownAsync()
     {
         _closing = true;
@@ -129,6 +161,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void NotifyCommands()
     {
         OnPropertyChanged(nameof(CanInteract));
+        ReturnToWorkCommand.NotifyCanExecuteChanged();
+        TemporaryAllowCommand.NotifyCanExecuteChanged();
         StartFocusCommand.NotifyCanExecuteChanged();
         PauseFocusCommand.NotifyCanExecuteChanged();
         ResumeFocusCommand.NotifyCanExecuteChanged();

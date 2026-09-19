@@ -38,6 +38,8 @@
                     <TextBlock Text="{Binding ActiveWindowTitle}" Margin="0,4,0,16" TextWrapping="Wrap" MaxHeight="84" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActiveWindowTitle}" AutomationProperties.AutomationId="ActiveWindowTitle" />
                     <TextBlock Text="Browser Page" Foreground="{StaticResource MutedText}" FontSize="12" />
                     <TextBlock Text="{Binding BrowserPageTitle}" Margin="0,4,0,0" TextWrapping="Wrap" MaxHeight="63" TextTrimming="CharacterEllipsis" ToolTip="{Binding BrowserPageTitle}" AutomationProperties.AutomationId="BrowserPageTitle" />
+                    <TextBlock Text="Current Website" Foreground="{StaticResource MutedText}" FontSize="12" Margin="0,12,0,0" />
+                    <TextBlock Text="{Binding BrowserUrl}" TextWrapping="Wrap" MaxHeight="63" TextTrimming="CharacterEllipsis" ToolTip="{Binding BrowserUrl}" AutomationProperties.AutomationId="BrowserUrl" />
                 </StackPanel>
             </Border>
             <TextBlock Text="{Binding TimerText}" FontSize="54" FontWeight="Light" HorizontalAlignment="Center" Margin="0,18,0,0" AutomationProperties.AutomationId="TimerText" />

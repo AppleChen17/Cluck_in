@@ -1,0 +1,19 @@
+.chicken-intervention {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  width: min(400px, calc(100vw - 48px));
+  padding: 24px;
+  box-sizing: border-box;
+  border: 2px solid #d6a64a;
+  border-radius: 20px;
+  background: #fff7dd;
+  color: #302615;
+  box-shadow: 0 12px 40px #30261526;
+  overflow-wrap: anywhere;
+}
+.chicken-intervention h2 { margin-top: 0; }
+.chicken-intervention-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.chicken-intervention button { padding: 10px 14px; cursor: pointer; }
+.chicken-intervention button:disabled { opacity: .55; cursor: default; }

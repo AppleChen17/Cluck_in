@@ -103,6 +103,12 @@ static class TaskChecks
                         var agent = app.Services.GetRequiredService<DesktopAgentService>();
                         var context = await agent.GetContextAsync();
                         if (context.WorkspaceId != "api-test" || !context.TimerRunning) throw new Exception("API and desktop do not share state");
+                        var intervention = await client.GetFromJsonAsync<InterventionState>("/api/intervention");
+                        if (intervention is not { IsActive: false }) throw new Exception("Unexpected initial intervention");
+                        var staleAction = await client.PostAsJsonAsync("/api/intervention/action", new InterventionActionRequest(Guid.NewGuid(), InterventionAction.TemporaryAllow));
+                        if (staleAction.StatusCode != HttpStatusCode.Conflict) throw new Exception("Stale intervention action accepted");
+                        var invalidAction = await client.PostAsJsonAsync("/api/intervention/action", new InterventionActionRequest(Guid.NewGuid(), InterventionAction.ShowIntervention));
+                        if (invalidAction.StatusCode != HttpStatusCode.BadRequest) throw new Exception("Unsupported intervention action accepted");
                         var missing = await client.PostAsJsonAsync("/api/tasks/missing/start", new { });
                         if (missing.StatusCode != HttpStatusCode.NotFound || !(await missing.Content.ReadAsStringAsync()).Contains("Task not found")) throw new Exception("404 error missing");
                         var invalid = await client.PutAsJsonAsync("/api/tasks/bad", new TaskProfile { Id = "bad", Name = "Bad", FocusDurationMinutes = -1 });
@@ -114,7 +120,7 @@ static class TaskChecks
                         client.DefaultRequestHeaders.Add("Origin", "https://untrusted.example");
                         var origin = await client.PostAsJsonAsync("/api/tasks/api-test/start", new { });
                         if (origin.StatusCode != HttpStatusCode.Forbidden) throw new Exception("Untrusted origin accepted");
-                        Console.WriteLine("Passed 9 Task API integration checks (no real app or URL launched).");
+                        Console.WriteLine("Passed 12 Task/Intervention API integration checks (no real app or URL launched).");
                     }
                     finally { await app.StopAsync(); }
                     completion.SetResult();
@@ -133,6 +139,7 @@ static class TaskChecks
 
     private sealed class FakeDesktop(Action beforeLaunch) : IDesktopManager
     {
+        public Task<bool> ReturnToWorkAsync(DesktopContext context) => Task.FromResult(true);
         public List<string> Opened { get; } = [];
         public Task OpenApplicationAsync(string path) => Open(path);
         public Task OpenUrlAsync(string url) => Open(url);

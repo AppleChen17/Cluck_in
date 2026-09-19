@@ -29,15 +29,16 @@ Check(workspaces.GetWorkspaces()[1].AllowedApplications.Count == 1, "Rules copie
 
 var focus = new FocusManager();
 FocusEvaluation Evaluate(string process, string title, WorkspaceProfile? workspace = null) =>
-    focus.Evaluate(new() { ActiveWindow = new() { ProcessName = process, WindowTitle = title } }, workspace ?? coding);
+    focus.Evaluate(new() { ActiveWindow = new() { ProcessName = process, WindowTitle = title },
+        Browser = process == "chrome" ? new() { BrowserName = "Chrome", Url = title.Contains("YouTube") ? "https://youtube.com" : title.Contains("GitHub", StringComparison.OrdinalIgnoreCase) ? "https://github.com" : "https://example.com" } : null }, workspace ?? coding);
 Check(Evaluate("Code.EXE", "project").IsFocused, "VS Code focused, normalized process");
 Check(Evaluate("WindowsTerminal", "terminal").IsFocused, "Terminal focused");
 Check(Evaluate("chrome", "github - Google Chrome").IsFocused, "GitHub focused, case insensitive");
 var youtube = Evaluate("chrome", "YouTube - Google Chrome");
-Check(youtube.IsEvaluated && !youtube.IsFocused && youtube.DetectedDistraction == "YouTube", "YouTube distracted");
+Check(youtube.IsEvaluated && !youtube.IsFocused && youtube.DetectedDistraction == "youtube.com", "YouTube distracted");
 Check(!Evaluate("code", "YouTube GitHub").IsFocused, "Blocked keyword beats allowed app and keyword");
-Check(!Evaluate("chrome", "GitHub", coding with { BlockedApplications = ["CHROME.exe"] }).IsFocused, "Blocked app takes priority");
-Check(!Evaluate("chrome", "Unclassified page").IsEvaluated, "Unknown page neutral");
+Check(Evaluate("chrome", "GitHub", coding with { BlockedApplications = ["CHROME.exe"] }).IsFocused, "Chrome ignores app rules and uses URL");
+Check(Evaluate("chrome", "Unclassified page") is { IsEvaluated: true, IsFocused: false }, "Unlisted activity is denied");
 Check(!Evaluate("", "").IsEvaluated, "Missing window neutral");
 
 var browsers = new BrowserManager();
@@ -74,8 +75,8 @@ timer.Resume();
 Check(timer.GetCurrentSession().Status == FocusSessionStatus.Completed, "Completed cannot resume");
 
 var windows = new FakeWindowManager();
-var context = new ContextManager(windows, browsers, workspaces, timer);
-var agent = new DesktopAgentService(context, workspaces, focus, timer);
+var context = new ContextManager(windows, new BrowserManager(new TestBrowserUrlReader()), workspaces, timer);
+var agent = new DesktopAgentService(context, workspaces, new FocusManager(timer), timer);
 Check(!(await agent.EvaluateFocusAsync()).IsEvaluated, "Inactive focus neutral");
 agent.StartFocus("coding", TimeSpan.FromMinutes(25));
 Check((await agent.GetContextAsync()) is { WorkspaceId: "coding", FocusModeEnabled: true, TimerRunning: true, Browser.BrowserName: "Chrome" }, "Context aggregation");
@@ -93,6 +94,8 @@ Check(!(await agent.GetContextAsync()).FocusModeEnabled && timer.GetCurrentSessi
 Console.WriteLine($"Passed {assertions} Desktop Agent checks.");
 await ViewModelChecks.RunAsync();
 await TaskChecks.RunAsync();
+await InterventionChecks.RunAsync();
+await BrowserUrlChecks.RunAsync();
 if (args.Contains("--ui")) await WpfLaunchChecks.RunAsync();
 
 sealed class FakeWindowManager : IWindowManager
@@ -110,4 +113,11 @@ sealed class ManualClock : TimeProvider
     public override long GetTimestamp() => _ticks;
     public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(_ticks);
     public void Advance(TimeSpan duration) => _ticks += duration.Ticks;
+}
+
+// Explicit URL fixture for fake browser windows; production never infers URLs from titles.
+sealed class TestBrowserUrlReader : IBrowserUrlReader
+{
+    public Task<string?> ReadUrlAsync(ActiveWindowInfo window) => Task.FromResult<string?>(
+        window.WindowTitle.Contains("YouTube") ? "https://youtube.com" : "https://github.com");
 }

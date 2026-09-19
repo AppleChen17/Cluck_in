@@ -15,7 +15,10 @@ public static class DesktopAgentFactory
         var workspaces = CreateWorkspaces();
         var timer = new TimerManager();
         var context = new ContextManager(new WindowManager(), new BrowserManager(), workspaces, timer);
-        return new DesktopAgentService(context, workspaces, new FocusManager(timer), timer);
+        var whitelist = new WhitelistManager();
+        var intervention = new InterventionManager(new DesktopManager(Microsoft.Extensions.Logging.Abstractions.NullLogger<DesktopManager>.Instance));
+        return new DesktopAgentService(context, workspaces, new FocusManager(timer, whitelist, intervention), timer,
+            whitelistManager: whitelist, interventionManager: intervention);
     }
 
     public static void RegisterServices(IServiceCollection services)
@@ -24,8 +27,10 @@ public static class DesktopAgentFactory
         services.AddSingleton<ITimerManager, TimerManager>();
         services.AddSingleton<IWindowManager, WindowManager>();
         services.AddSingleton<IBrowserManager, BrowserManager>();
+        services.AddSingleton<IBrowserUrlReader, BrowserUrlReader>();
         services.AddSingleton<IContextManager, ContextManager>();
         services.AddSingleton<IFocusManager, FocusManager>();
+        services.AddSingleton<IInterventionManager, InterventionManager>();
         services.AddSingleton<ISessionManager, SessionManager>();
         services.AddSingleton<IWhitelistManager, WhitelistManager>();
         services.AddSingleton<IDesktopManager, DesktopManager>();
@@ -44,9 +49,13 @@ public static class DesktopAgentFactory
             {
                 Id = "task_001", Name = "Cluck In Development",
                 Description = "Develop and test Cluck In.",
-                Apps = [candidates.FirstOrDefault(p => p is not null && File.Exists(p)) ?? candidates[1]!],
+                Apps =
+                [
+                    candidates.FirstOrDefault(p => p is not null && File.Exists(p)) ?? candidates[1]!,
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")
+                ],
                 Urls = ["http://localhost:5173", "https://github.com/AppleChen17/Cluck_in", "https://chatgpt.com"],
-                AllowedApps = ["Code.exe", "chrome.exe"],
+                AllowedApps = ["Code.exe", "explorer.exe", "chrome.exe"],
                 AllowedDomains = ["localhost", "github.com", "chatgpt.com"],
                 FocusDurationMinutes = 50
             }).GetAwaiter().GetResult();
@@ -61,6 +70,7 @@ public static class DesktopAgentFactory
         {
             Id = "reading", Name = "Reading",
             AllowedApplications = ["AcroRd32", "Acrobat"],
+            AllowedDomains = ["wikipedia.org", "learn.microsoft.com", "developer.mozilla.org"],
             AllowedWindowKeywords = ["Documentation", "Wikipedia", ".pdf"],
             BlockedWindowKeywords = ["YouTube", "Instagram", "Netflix"]
         });
@@ -68,6 +78,7 @@ public static class DesktopAgentFactory
         {
             Id = "writing", Name = "Writing",
             AllowedApplications = ["WINWORD", "notepad"],
+            AllowedDomains = ["docs.google.com"],
             AllowedWindowKeywords = ["Google Docs"],
             BlockedWindowKeywords = ["YouTube", "Instagram", "Netflix"]
         });
@@ -75,6 +86,7 @@ public static class DesktopAgentFactory
         {
             Id = "meeting", Name = "Meeting",
             AllowedApplications = ["ms-teams", "Teams", "Zoom"],
+            AllowedDomains = ["meet.google.com", "teams.microsoft.com", "zoom.us"],
             AllowedWindowKeywords = ["Google Meet", "Microsoft Teams"],
             BlockedWindowKeywords = ["Instagram", "Netflix"]
         });

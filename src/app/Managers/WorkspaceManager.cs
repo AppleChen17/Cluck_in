@@ -15,7 +15,8 @@ public sealed class WorkspaceManager : IWorkspaceManager
             Id = "coding",
             Name = "Coding",
             AllowedApplications = ["code", "devenv", "WindowsTerminal"],
-            AllowedWindowKeywords = ["GitHub", "Stack Overflow", "Documentation"],
+            AllowedDomains = ["localhost", "github.com", "stackoverflow.com", "chatgpt.com", "learn.microsoft.com", "developer.mozilla.org"],
+            AllowedWindowKeywords = ["GitHub", "Stack Overflow", "Documentation", "ChatGPT"],
             BlockedWindowKeywords = ["YouTube", "Instagram", "Netflix"]
         });
     }
