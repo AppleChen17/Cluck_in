@@ -13,6 +13,10 @@ p, h1, h2 { margin: 0; }
 .dashboard { max-width: 1160px; margin: 0 auto; padding: 48px 28px 24px; }
 .page-header, .brand, .card-heading, .score-label { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .brand { justify-content: flex-start; }
+.dashboard-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.workspace-rules-link { display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 10px; background: #34583e; color: white; font-size: 13px; font-weight: 600; text-decoration: none; }
+.workspace-rules-link:hover { background: #284730; }
+.workspace-rules-link:focus-visible { outline: 3px solid #789c63; outline-offset: 3px; }
 .brand-icon { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; background: #e8ecdb; font-size: 34px; }
 .eyebrow { font-size: 10px; letter-spacing: 2px; font-weight: 700; color: #67745e; margin-bottom: 6px; }
 h1 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -1px; line-height: 1.2; }

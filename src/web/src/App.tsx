@@ -1,3 +1,29 @@
+import { useEffect, useState } from 'react';
+import WorkspaceRules from './components/WorkspaceRules';
+import TaskLauncher from './components/TaskLauncher';
+import './workspace-rules.css';
+
+export default function App() {
+  const [route, setRoute] = useState(window.location.hash);
+  useEffect(() => {
+    const update = () => setRoute(window.location.hash);
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  }, []);
+  const editingRules = route === '#/workspace-rules';
+  return (
+    <>
+      <nav className="app-nav" aria-label="Main navigation">
+        <a href="#/dashboard" aria-current={!editingRules ? 'page' : undefined}>Dashboard</a>
+        <a href="#/workspace-rules" aria-current={editingRules ? 'page' : undefined}>Workspace Rules</a>
+      </nav>
+      <div hidden={editingRules}><Dashboard /></div>
+      {/* Keep the editor mounted so tab navigation preserves per-workspace drafts. */}
+      <div hidden={!editingRules}><WorkspaceRules /></div>
+    </>
+  );
+}
+
 const demo = {
   mode: 'Focus',
   task: 'Prepare Demo',
@@ -18,7 +44,8 @@ const demo = {
   ],
 };
 
-export default function App() {
+function Dashboard() {
+  const [currentTask, setCurrentTask] = useState(demo.task);
   return (
     <main className="dashboard">
       <header className="page-header">
@@ -29,12 +56,16 @@ export default function App() {
             <h1>Cluck In Dashboard</h1>
           </div>
         </div>
-        <span className="demo-badge">Mock data · Demo</span>
+        <div className="dashboard-header-actions">
+          <span className="demo-badge">Mock data · Demo</span>
+          <a className="workspace-rules-link" href="#/workspace-rules">Workspace Rules <span aria-hidden="true">→</span></a>
+        </div>
       </header>
 
       <p className="intro">A little less distraction. A little more focus.</p>
 
       <div className="dashboard-grid">
+        <TaskLauncher onStarted={setCurrentTask} />
         <section className="card session" aria-labelledby="session-heading">
           <div className="card-heading">
             <h2 id="session-heading">Session</h2>
@@ -49,7 +80,7 @@ export default function App() {
             ))}
           </ul>
           <p className="label">Current Task</p>
-          <p className="task">{demo.task}</p>
+          <p className="task">{currentTask}</p>
           <div className="timer-block">
             <p className="label">Focus Timer</p>
             <p className="timer" aria-label="24 minutes and 32 seconds remaining">{demo.timer}</p>
@@ -109,7 +140,7 @@ export default function App() {
           </ol>
         </section>
       </div>
-      <footer>Hackathon preview · Static session, timer, and AI results · No backend connection</footer>
+      <footer>Task buttons connect to Desktop Agent · Timer and AI results are demo data</footer>
     </main>
   );
 }
