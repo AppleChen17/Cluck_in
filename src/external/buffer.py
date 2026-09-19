@@ -20,6 +20,7 @@ import threading
 import uuid
 from collections import deque
 
+import normalize
 from schemas import ExternalMessage
 
 _CURSOR_RE = re.compile(r"^v1:([0-9a-f]{1,32}):(\d+)$")
@@ -76,11 +77,38 @@ class MessageBuffer:
         retries. `since` is an ADDITIONAL filter on the send timestamp, never a
         delivery cursor.
 
+        Raises ValueError if `since` is not RFC 3339 with an explicit offset.
+
+        Client input and our own data are treated differently on purpose. A bad
+        `since` raises: silently ignoring it would let the caller believe a
+        filter had been applied and act on a full batch. A message whose own
+        timestamp is unusable is kept: that is only reachable through
+        /debug/inject (to_rfc3339 always emits an offset), and dropping server
+        data over one hand-written record is worse than passing it through.
+        Keeping it also avoids comparing naive to aware, which raises TypeError
+        and would take the endpoint down.
         """
+        cutoff = None
+        if since:
+            cutoff = normalize.parse_rfc3339(since)
+            if cutoff is None:
+                raise ValueError(
+                    "since must be an RFC 3339 timestamp with an explicit "
+                    "offset (Z or +hh:mm), got {!r}".format(since)
+                )
+
         with self._lock:
             pending = [(s, m) for s, m in self._items if s > seq]
-            if since:
-                pending = [(s, m) for s, m in pending if m.timestamp >= since]
+            if cutoff is not None:
+                # Compare instants. The same moment is spelled differently in
+                # different offsets, so comparing the strings is only correct
+                # while every value happens to share one offset.
+                pending = [
+                    (s, m)
+                    for s, m in pending
+                    if (sent := normalize.parse_rfc3339(m.timestamp)) is None
+                    or sent >= cutoff
+                ]
             window = pending[:limit]
             has_more = len(pending) > len(window)
             last = window[-1][0] if window else seq

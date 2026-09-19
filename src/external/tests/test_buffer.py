@@ -67,6 +67,88 @@ def test_since_filters_without_acting_as_a_cursor():
     assert [m.id for m in items] == ["gmail:2"]
 
 
+# -- `since` is an instant, not a string --------------------------------------
+#
+# Every message this service emits today carries the same offset (the host's
+# local one), which is exactly why comparing the strings looks correct. It stops
+# being correct the moment a client sends "Z" or EXTERNAL_TZ=utc is set.
+
+
+def test_since_excludes_a_message_the_string_comparison_would_keep():
+    """11:31+08:00 is 03:31Z, which is BEFORE 04:00Z, so it must be excluded.
+
+    Lexically "2026-09-19T11:31..." sorts after "2026-09-19T04:00...", so a
+    string comparison returns it.
+    """
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1, "2026-09-19T11:31:00+08:00"))
+    items, _, _ = buf.read_after(0, 100, since="2026-09-19T04:00:00Z")
+    assert items == []
+
+
+def test_since_keeps_a_message_the_string_comparison_would_drop():
+    """The EXTERNAL_TZ=utc case: 03:00+00:00 is AFTER 10:00+08:00 (02:00Z).
+
+    Lexically "T03:00" sorts before "T10:00", so a string comparison drops it.
+    """
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1, "2026-09-19T03:00:00+00:00"))
+    items, _, _ = buf.read_after(0, 100, since="2026-09-19T10:00:00+08:00")
+    assert [m.id for m in items] == ["gmail:1"]
+
+
+def test_since_is_inclusive_at_the_same_instant():
+    """Guards the boundary: >= , not > , even when the offsets differ."""
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1, "2026-09-19T11:31:00+08:00"))
+    items, _, _ = buf.read_after(0, 100, since="2026-09-19T03:31:00Z")
+    assert [m.id for m in items] == ["gmail:1"]
+
+
+def test_z_suffix_and_explicit_offset_are_equivalent():
+    """datetime.fromisoformat only accepts "Z" itself on 3.11+."""
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1, "2026-09-19T11:31:00+08:00"))
+    with_z = buf.read_after(0, 100, since="2026-09-19T03:31:00Z")[0]
+    with_offset = buf.read_after(0, 100, since="2026-09-19T03:31:00+00:00")[0]
+    assert [m.id for m in with_z] == [m.id for m in with_offset] == ["gmail:1"]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "2026-09-19T11:31:00",  # naive: the contract requires an offset
+        "2026-09-19",           # date only
+        "1789000000",           # epoch seconds
+        "yesterday",
+    ],
+)
+def test_unusable_since_is_rejected_not_silently_ignored(bad):
+    """Ignoring it would let the client believe a filter had been applied."""
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1))
+    with pytest.raises(ValueError):
+        buf.read_after(0, 100, since=bad)
+
+
+def test_empty_since_is_not_a_filter():
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1))
+    assert len(buf.read_after(0, 100, since="")[0]) == 1
+
+
+def test_message_with_an_unusable_timestamp_survives_the_filter():
+    """Only reachable via /debug/inject -- to_rfc3339 always emits an offset.
+
+    Such a message must not be dropped silently, and comparing it must not raise
+    TypeError (naive vs aware), which would take the whole endpoint down.
+    """
+    buf = MessageBuffer(maxlen=10)
+    buf.add(make(1, "2026-09-19T11:31:00"))
+    items, _, _ = buf.read_after(0, 100, since="2026-09-19T04:00:00Z")
+    assert [m.id for m in items] == ["gmail:1"]
+
+
 def test_out_of_order_send_time_is_still_delivered():
     """A delayed email arrives with an older send time than one already sent.
 

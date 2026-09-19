@@ -28,7 +28,7 @@ Returns messages that arrived after your cursor.
 |---|---|---|---|
 | `cursor` | string | — | Opaque. From a previous response. Omit on the first call. |
 | `limit` | int | 100 | 1–500. Values outside that range return `422`. |
-| `since` | RFC 3339 | — | Optional **extra** filter on send time. **Not** a delivery cursor. |
+| `since` | RFC 3339 | — | Optional **extra** filter on send time. **Not** a delivery cursor. Must carry an explicit offset (`Z` or `±hh:mm`); a naive or malformed value returns `422` rather than being ignored. Compared as an instant, so any offset works. |
 
 ### Response
 

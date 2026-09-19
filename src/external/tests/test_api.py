@@ -46,6 +46,21 @@ def test_messages_carry_no_helper_fields(client):
         assert set(message) <= allowed
 
 
+def test_since_filters_by_instant_not_by_string(client):
+    """The fixtures are 11:31+08:00 and 11:32+08:00, i.e. 03:31Z and 03:32Z.
+
+    A string comparison keeps both, because "T11:3..." sorts after "T03:3...".
+    """
+    body = client.get("/messages", params={"since": "2026-09-19T03:31:30Z"}).json()
+    assert [m["id"] for m in body["messages"]] == ["slack:msg-001"]
+
+
+@pytest.mark.parametrize("bad", ["2026-09-19T11:31:00", "yesterday"])
+def test_unusable_since_returns_422(client, bad):
+    """Naive or malformed, never silently ignored -- the doc promises RFC 3339."""
+    assert client.get("/messages", params={"since": bad}).status_code == 422
+
+
 def test_cursor_drains_then_returns_empty(client):
     first = client.get("/messages").json()
     second = client.get("/messages", params={"cursor": first["cursor"]}).json()

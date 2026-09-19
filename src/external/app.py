@@ -13,7 +13,7 @@ Slack socket connections delivering every event twice.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 
 from buffer import MessageBuffer, encode_cursor, parse_cursor
 from config import Settings, load_settings
@@ -97,8 +97,8 @@ def messages(
     limit: int = Query(default=100, ge=1, le=500),
     since: str | None = Query(
         default=None,
-        description="Optional EXTRA filter on the send timestamp (RFC 3339). "
-        "This is not a delivery cursor.",
+        description="Optional EXTRA filter on the send timestamp (RFC 3339, with "
+        "an explicit offset). This is not a delivery cursor.",
     ),
 ) -> MessagesResponse:
     epoch, seq = parse_cursor(cursor)
@@ -109,7 +109,12 @@ def messages(
     if epoch != buffer.epoch:
         seq = 0
 
-    items, last_seq, has_more = buffer.read_after(seq, limit, since)
+    try:
+        items, last_seq, has_more = buffer.read_after(seq, limit, since)
+    except ValueError as exc:
+        # `since` is the client's, so this is a 422 like any other bad query
+        # parameter -- not a 500, and never a silently ignored filter.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return MessagesResponse(
         messages=items,
         cursor=encode_cursor(buffer.epoch, last_seq),
@@ -122,8 +127,6 @@ def messages(
 @app.post("/debug/inject", response_model=MessagesResponse, include_in_schema=False)
 def debug_inject(message: ExternalMessage) -> MessagesResponse:
     """Push a hand-written message into the buffer. Gated by EXTERNAL_DEBUG."""
-    from fastapi import HTTPException
-
     if not settings.external_debug:
         raise HTTPException(status_code=404, detail="not found")
     accepted = buffer.add(message)

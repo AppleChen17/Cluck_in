@@ -209,6 +209,35 @@ def now_rfc3339(tz_mode: str = "local") -> str:
     return to_rfc3339(datetime.now(timezone.utc), tz_mode)
 
 
+def parse_rfc3339(value: str) -> datetime | None:
+    """Parse a contract timestamp into an instant. None means unusable.
+
+    The inverse of to_rfc3339, with the opposite attitude to a missing offset.
+    to_rfc3339 is fixing up a datetime we already own, so it assumes UTC; this
+    reads someone else's input, where guessing would silently shift the value by
+    the reader's offset. The contract requires an explicit offset, so a naive
+    value is rejected instead.
+
+    Callers must not compare these strings directly: the same instant is spelled
+    differently depending on the offset, and lexical order is not chronological
+    order across two different offsets.
+    """
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    # datetime.fromisoformat only accepts a bare "Z" on 3.11+; the repo README
+    # claims 3.10+, and "Z" is the spelling most clients reach for first.
+    if value.endswith(("Z", "z")):
+        value = value[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
 # Slack wraps links, mentions and channel refs in angle brackets. Left raw they
 # read as noise to a human and to a model alike.
 _SLACK_LINK = re.compile(r"<(https?://[^>|]+)\|([^>]+)>")
