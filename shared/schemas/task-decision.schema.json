@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cluck-in.example/schemas/v1/task-decision.schema.json",
+  "title": "TaskDecision",
+  "description": "Structured relevance decision for an application or webpage target.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision",
+    "relevance",
+    "reason"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "warn",
+        "block"
+      ],
+      "description": "allow: clearly relevant; warn: possibly relevant but ambiguous; block: clearly unrelated during focus mode."
+    },
+    "relevance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Relevance to the current task, from 0 (none) to 1 (highest)."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short human-readable explanation, never a command to execute."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional normalized extension fields."
+    }
+  }
+}

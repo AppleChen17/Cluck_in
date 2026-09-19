@@ -1,0 +1,15 @@
+{
+  "target": {
+    "type": "web",
+    "name": "FastAPI Documentation",
+    "title": "Request Body - FastAPI",
+    "url": "https://fastapi.tiangolo.com/tutorial/body/",
+    "identifier": null
+  },
+  "context": {
+    "mode": "focus",
+    "currentTask": "Implement AI Engine API",
+    "focusStartedAt": "2026-09-19T16:00:00+08:00",
+    "focusDurationSeconds": 1500
+  }
+}
