@@ -8,6 +8,7 @@ the C# side can be written and tested before a single token exists.
 import json
 
 from config import FIXTURES_DIR
+from reply_registry import target_from_message
 from schemas import ExternalMessage
 
 from adapters.source_adapter import MessageSink, SourceAdapter
@@ -27,6 +28,10 @@ class FixtureAdapter(SourceAdapter):
             except Exception as exc:  # noqa: BLE001 - one bad fixture must not kill startup
                 self._mark_error(f"{filename}: {type(exc).__name__}: {exc}")
                 continue
+            # Recovered from the message, not from a provider payload: a
+            # fixture never went through Gmail or Slack. Good enough to let the
+            # credential-free path exercise replying too.
+            self._remember_target(target_from_message(message))
             if sink(message):
                 self._mark_emitted(message.timestamp)
         self._mark_connected(True)

@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "Cluck In",
-    "description": "Reads public channel messages so the focus chicken can decide what deserves an interruption.",
+    "description": "Reads public channel messages so the focus chicken can decide what deserves an interruption, and answers the ones it can handle itself.",
     "background_color": "#2c2d30"
   },
   "features": {
@@ -15,7 +15,9 @@
       "bot": [
         "channels:history",
         "channels:read",
-        "users:read"
+        "users:read",
+        "chat:write",
+        "reactions:write"
       ]
     }
   },

@@ -1,12 +1,23 @@
-# src/external — message adapters
+# src/external — messages in, replies out
 
-Fetches messages from Gmail and Slack and normalizes them into the shared
-[`ExternalMessage`](../../shared/schemas/external-message.schema.json) contract,
-served over localhost HTTP for `src/app` to poll.
+Two directions.
 
-**This module does not call the AI engine.** It fetches and normalizes, nothing
-more. `src/app` polls `GET /messages` here, composes its own `AIRequest`, and
-calls `src/ai-engine` separately.
+**Inbound:** fetches messages from Gmail and Slack and normalizes them into the
+shared [`ExternalMessage`](../../shared/schemas/external-message.schema.json)
+contract, served over localhost HTTP for `src/app` to poll.
+
+**Outbound:** sends the reply `src/app` decided on — back into the same mail
+thread or the same Slack thread — and reads and writes Google Calendar, which
+is what lets "when are you free?" be answered without a person.
+
+**This module does not call the AI engine, and it does not decide what to say.**
+`src/app` polls `GET /messages` here, composes its own `AIRequest`, calls
+`src/ai-engine` separately, and posts the answer back to `POST /reply` here.
+
+Sending is **off by default**: `EXTERNAL_SEND_DRY_RUN=true` routes and records
+every send and hands nothing to a provider, so the whole integration can be
+built and rehearsed before anything leaves the machine. See
+[`docs/API.md`](docs/API.md) before calling anything that sends.
 
 ## Why there is Python next to a .csproj
 
@@ -58,8 +69,10 @@ committed example messages, so it works on a fresh clone with no credentials.
 Every setting lives in `src/external/.env`; see
 [`.env.example`](.env.example) for the full list.
 `EXTERNAL_ADAPTERS` selects sources: a comma list of `gmail`, `slack`, `fixture`.
+`CALENDAR_BACKEND` selects `memory` (no credentials) or `google`.
 
-Credentials setup is in [`docs/Setup.md`](docs/Setup.md).
+Credentials setup is in [`docs/Setup.md`](docs/Setup.md), including why the
+calendar is the one thing here that cannot use an app password.
 
 ## Tests
 
@@ -68,7 +81,7 @@ cd C:\Users\user\Desktop\Cluck_in
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-84 tests, no credentials and no network required. Gmail parsing runs against
+266 tests, no credentials and no network required. Gmail parsing runs against
 canned RFC 822 bytes and Slack against canned event payloads, so the whole
 normalization surface — MIME multipart, Big5, RFC 2047 subjects, HTML
 flattening, quoted-reply trimming, Slack markup, event filtering — is covered
@@ -84,15 +97,107 @@ strict C# deserializer would otherwise reject at runtime.
 
 | File | Purpose |
 |---|---|
-| `app.py` | FastAPI app: `/health`, `/messages`, `/debug/inject` |
+| `app.py` | FastAPI app: every endpoint |
 | `buffer.py` | Thread-safe buffer and cursor, shared by the adapter threads and the request threads |
 | `normalize.py` | Pure text/timestamp helpers: HTML flattening, quoted-reply trimming, Slack markup, RFC 3339 |
-| `schemas.py` | `ExternalMessage` and the HTTP envelope |
+| `schemas.py` | `ExternalMessage`, `ExternalEvent` and the HTTP envelopes |
 | `config.py` | Settings, loaded from `.env` |
+| `reply_registry.py` | Where a reply goes, keyed by message id — the routing the contract deliberately does not carry |
+| `idempotency.py` | Bounded "have we already done this for that message?" memo |
 | `adapters/gmail_adapter.py` | IMAP polling thread |
 | `adapters/slack_adapter.py` | Socket Mode listener |
 | `adapters/fixture_adapter.py` | Replays `shared/fixtures`, needs no credentials |
+| `sender/base.py` | The dry run, the allowlist, and the one path every outbound message takes |
+| `sender/outbox.py` | What was sent or would have been; one reply per message, ever |
+| `sender/gmail_sender.py` | SMTP send, RFC 822 threading, filing a copy in Sent |
+| `sender/slack_sender.py` | `chat.postMessage` and `reactions.add` |
+| `gcal/availability.py` | Pure: free slots from busy blocks. No network, no state |
+| `gcal/memory_calendar.py` | In-process calendar, needs no credentials |
+| `gcal/google_calendar.py` | Google Calendar API v3 |
+| `scripts/setup_google_oauth.py` | One-off OAuth, see `docs/Setup.md` |
+| `scripts/seed_demo_messages.py` | Demo scaffolding — see below |
+| `scripts/auto_reply_demo.py` | Demo glue, not production code — see below |
 | `scripts/try_llm.py` | Probe, not production code — see below |
+
+`gcal` rather than `calendar`: this module uses flat imports
+(`uvicorn --app-dir src/external`), so a package named `calendar` here would
+shadow the standard library module of that name for the whole process.
+
+## Demoing the auto-reply loop
+
+Two scripts, neither of them production code and neither imported by anything.
+Together they show the whole feature **with no credentials at all**.
+
+```powershell
+# terminal 1 - the service. EXTERNAL_DEBUG=true in .env is required.
+.\.venv\Scripts\python.exe -m uvicorn app:app --app-dir src\external --port 8100 --workers 1
+
+# terminal 2
+.\.venv\Scripts\python.exe src\external\scripts\seed_demo_messages.py
+.\.venv\Scripts\python.exe src\external\scripts\auto_reply_demo.py --once
+```
+
+### `scripts/seed_demo_messages.py`
+
+Injects three messages through `POST /debug/inject`.
+
+Why not the committed fixtures? **They cannot be replied to.** The Slack fixture
+id is `slack:msg-001`, which carries no channel, and the Gmail fixture has no
+address to answer — `ExternalMessage.sender` is a display name by contract. The
+seeded messages carry ids and metadata that route, so `POST /reply` works.
+
+The three are chosen deliberately:
+
+| | The chicken |
+|---|---|
+| "什麼時候有空？" | checks the calendar, answers with real slots |
+| "我們約在下週二下午三點開會" | reacts 👍 and adds the calendar entry |
+| "下週一開始咖啡機移到二樓" | **does nothing** |
+
+The third is the one worth showing. An assistant that answers everything is not
+trustworthy; the demo should prove it declines to speak when it has nothing to
+add.
+
+`--reply-to you@gmail.com` to point the email at yourself for a live run.
+
+### `scripts/auto_reply_demo.py`
+
+The loop, in a straight line:
+
+```
+GET /messages            what arrived
+  classify intent        local model, or keywords if it is not running
+asking when you are free:
+  POST /calendar/availability    real free slots, computed not guessed
+  POST /reply                    answer in the same thread
+telling you about a meeting:
+  POST /react                    a thumbs up is a real answer
+  POST /calendar/events          put it on the calendar
+```
+
+**This is not a stand-in for `src/app`.** The real product decides in the C#
+state machine, with the focus session and the current task in hand, and calls
+the same endpoints. This exists so the feature can be seen working and rehearsed
+before that side is ready.
+
+Two things it does on purpose, both worth copying into the C# side:
+
+- **The reply is a template wrapped around `/calendar/availability`'s `text`,
+  not model-generated.** The slots are the part that has to be right, and they
+  came from real arithmetic; letting a 3b model restate them is how 14:00
+  becomes 15:00.
+- **An extracted meeting time is validated before use.** No offset, unparseable,
+  or in the past means no calendar entry and a line saying so. Models reach for
+  the current year and last week's weekday; a meeting on the wrong day is worse
+  than no meeting.
+
+`--no-llm` forces the keyword classifier, which is crude but never fails to
+start. It is there so the demo degrades to something visible instead of dying on
+stage. It also cannot extract a time, so a meeting invite gets the reaction and
+no calendar entry — visible in the output, not silent.
+
+With `EXTERNAL_SEND_DRY_RUN=true` (the default) nothing is sent; watch
+`GET /outbox` for what it would have said.
 
 ## `scripts/try_llm.py`
 
@@ -149,3 +254,20 @@ is what changes between machines.
   in the buffer is what makes that correct.
 - **A bot token cannot read human-to-human Slack DMs.** `im:history` covers only
   DMs with the bot itself. Reading your own DMs needs a user token (`xoxp-`).
+- **Sending is off by default and that is the most likely reason a reply did not
+  arrive.** Check `sending.dryRun` in `/health` first.
+- **The reply registry is in memory too.** After a restart `GET /messages`
+  replays what it has, but those messages can no longer be answered by id;
+  `POST /reply` returns a `404` saying so, and `/send/gmail` and `/send/slack`
+  with an explicit destination are the way through.
+- **One reply per message and one calendar entry per `fromMessageId`, and both
+  memos are bounded.** Answering something from long enough ago that it has
+  fallen out of the memo would send a second reply. The bounds are 4x the outbox
+  size and the outbox size respectively.
+- **Google Calendar needs OAuth, and a Testing-mode refresh token expires after
+  seven days.** Re-run `scripts/setup_google_oauth.py`. There is no app-password
+  path for the calendar — see `docs/Setup.md` for why.
+- **All-day calendar events are skipped**, matching `docs/data-contracts.md`,
+  which defers them.
+- **Nothing here decides what to say.** If the replies read badly, that is the
+  caller's prompt, not this module.

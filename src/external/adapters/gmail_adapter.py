@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 import normalize
 from adapters.source_adapter import MessageSink, SourceAdapter
 from config import Settings
+from reply_registry import ReplyTarget
 from schemas import ExternalMessage
 
 log = logging.getLogger("external.gmail")
@@ -169,6 +170,55 @@ def build_message(
     )
 
 
+def _extract_reply_address(msg) -> str | None:
+    """Where a reply goes: Reply-To when present, otherwise From.
+
+    An address, not a display name. ExternalMessage.sender is deliberately the
+    display name -- "normalized human-readable strings, not provider user
+    objects" -- so this cannot be recovered from the contract afterwards, which
+    is the whole reason for the reply registry.
+
+    Reply-To first is not a detail: mailing lists, ticketing systems and
+    no-reply senders all set it, and answering From instead sends the reply
+    somewhere nobody reads.
+    """
+    for header in ("Reply-To", "From"):
+        value = msg[header]
+        if value is None:
+            continue
+        try:
+            addresses = value.addresses
+            if addresses and addresses[0].addr_spec:
+                return addresses[0].addr_spec
+        except (AttributeError, IndexError, TypeError, ValueError):
+            parsed = email.utils.parseaddr(str(value))[1]
+            if parsed:
+                return parsed
+    return None
+
+
+def build_reply_target(raw: bytes, message_id: str) -> ReplyTarget | None:
+    """Pure: how to answer one raw message. None when there is no address.
+
+    Parses the bytes a second time rather than threading a parsed message
+    through build_message, which is the module's tested public entry point. A
+    few milliseconds once per new mail, against a poll that runs every 30
+    seconds, is not worth complicating that signature for.
+    """
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    address = _extract_reply_address(msg)
+    if not address:
+        return None
+    return ReplyTarget(
+        message_id=message_id,
+        source="gmail",
+        address=address,
+        rfc_message_id=(str(msg.get("Message-ID") or "").strip() or None),
+        references=(str(msg.get("References") or "").strip() or None),
+        subject=normalize.clean_title(str(msg.get("Subject") or "")),
+    )
+
+
 class GmailAdapter(SourceAdapter):
     name = "gmail"
 
@@ -299,5 +349,10 @@ class GmailAdapter(SourceAdapter):
                 sent = normalize.parse_rfc3339(message.timestamp)
                 if sent is not None and sent.timestamp() < self._started_at:
                     continue
+            try:
+                self._remember_target(build_reply_target(item[1], message.id))
+            except Exception:  # noqa: BLE001 - a message we cannot answer is
+                # still a message worth delivering; POST /reply will say so.
+                log.exception("could not derive a reply target for uid=%r", uid)
             if sink(message):
                 self._mark_emitted(message.timestamp)
