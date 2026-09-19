@@ -239,35 +239,6 @@ class OutboxResponse(BaseModel):
 # -- calendar -----------------------------------------------------------------
 
 
-class SlotModel(BaseModel):
-    start: str
-    end: str
-
-
-class AvailabilityRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    durationMinutes: int = Field(default=30, ge=5, le=480)
-    withinDays: int = Field(default=5, ge=1, le=30)
-    limit: int = Field(default=5, ge=1, le=20)
-
-
-class AvailabilityResponse(BaseModel):
-    """Candidate free slots, plus a ready-to-paste rendering of them.
-
-    `text` exists because date arithmetic is exactly what a small local model
-    gets wrong. The model should quote this string, not compute it. It is
-    rendered in Traditional Chinese to match the messages this module sees.
-    """
-
-    slots: list[SlotModel]
-    text: str
-    durationMinutes: int
-    searchedFrom: str
-    searchedTo: str
-    backend: str
-
-
 class CreateEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -31,8 +31,7 @@ know about each other.
 | | [`POST /send/slack`](#post-sendslack) | a fresh Slack post |
 | | [`POST /react`](#post-react) | an emoji reaction (Slack only) |
 | | [`GET /outbox`](#get-outbox) | what was sent, or would have been |
-| **cal** | [`POST /calendar/availability`](#post-calendaravailability) | when you are free |
-| | [`GET /calendar/events`](#get-calendarevents) | what is coming up |
+| **cal** | [`GET /calendar/events`](#get-calendarevents) | what is coming up |
 | | [`POST /calendar/events`](#post-calendarevents) | put a meeting on the calendar |
 | | [`GET /health`](#get-health) | |
 
@@ -299,50 +298,6 @@ watch during a rehearsal to see what it would have said.
 `?limit=` defaults to 50, max 500. In memory, and lost on restart.
 
 ---
-
-## `POST /calendar/availability`
-
-When you are free. Ask this **before** composing a reply about scheduling.
-
-```json
-{ "durationMinutes": 30, "withinDays": 5, "limit": 3 }
-```
-
-```json
-{
-  "slots": [
-    { "start": "2026-09-21T09:00:00+08:00", "end": "2026-09-21T09:30:00+08:00" },
-    { "start": "2026-09-21T11:00:00+08:00", "end": "2026-09-21T11:30:00+08:00" }
-  ],
-  "text": "9/21（一）09:00-09:30、11:00-11:30\n9/22（二）09:00-09:30",
-  "durationMinutes": 30,
-  "searchedFrom": "2026-09-19T20:45:00+08:00",
-  "searchedTo": "2026-09-24T19:45:00+08:00",
-  "backend": "memory"
-}
-```
-
-**Put `text` in the reply verbatim. Do not ask a model to compute or restate
-it.** "Which half-hours next week are free, inside working hours, on weekdays,
-that collide with none of these fourteen meetings" is arithmetic, and a 3b model
-gets arithmetic wrong in ways that are invisible until somebody shows up on the
-wrong day. The model reads the question and writes the sentence around `text`;
-this endpoint computes the answer.
-
-What the slots obey, all configurable in `.env`:
-
-| | Setting | Default |
-|---|---|---|
-| Never sooner than | `CALENDAR_LEAD_MINUTES` | 60 minutes from now |
-| Inside working hours | `CALENDAR_WORKDAY_START` / `_END` | 09:00–18:00 local |
-| Weekdays only | `CALENDAR_WEEKDAYS_ONLY` | true |
-| Aligned to the clock | `CALENDAR_SLOT_GRANULARITY_MINUTES` | 30 — a gap opening at 14:07 proposes 14:30 |
-| Spread out | — | at most 2 per day, at least 2 hours apart |
-
-The spread matters more than it sounds: 09:00, 09:30, 10:00, 10:30 and 11:00 on
-one Monday is technically five options and practically one.
-
-With no free slot at all, `slots` is `[]` and `text` says so in a sentence.
 
 ## `GET /calendar/events`
 

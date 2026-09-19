@@ -1,7 +1,7 @@
 """An in-process calendar. Needs no credentials, no GCP project, no network.
 
 This is to gcal what FixtureAdapter is to adapters: the thing that makes a fresh
-clone runnable. The availability maths, the ExternalEvent output, the API shape
+clone runnable. The ExternalEvent output, the API shape
 and every test are identical to the Google backend, so swapping CALENDAR_BACKEND
 to google later changes where the events live and nothing else.
 
@@ -65,9 +65,6 @@ class MemoryCalendar(CalendarBackend):
                 out.append((event_start, event_end, event))
         out.sort(key=lambda row: row[0])
         return out
-
-    def busy(self, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-        return [(s, e) for s, e, _ in self._in_window(start, end)]
 
     def events(self, start: datetime, end: datetime) -> list[ExternalEvent]:
         return [event for _, _, event in self._in_window(start, end)]

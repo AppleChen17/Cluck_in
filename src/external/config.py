@@ -4,7 +4,6 @@ Loaded from src/external/.env. Field names match the env var names
 case-insensitively, so `gmail_address` reads GMAIL_ADDRESS.
 """
 
-from datetime import time
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -98,14 +97,6 @@ class Settings(BaseSettings):
     # Empty falls back to src/external/credentials.json and token.json.
     google_credentials_file: str = ""
     google_token_file: str = ""
-    # Working hours proposed to whoever asked when you are free. HH:MM, local.
-    calendar_workday_start: str = "09:00"
-    calendar_workday_end: str = "18:00"
-    calendar_weekdays_only: bool = True
-    calendar_slot_granularity_minutes: int = 30
-    # Never propose a slot starting sooner than this. Offering a meeting eight
-    # minutes from now reads as a bug, not as helpfulness.
-    calendar_lead_minutes: int = 60
     # True lets Google email the attendees when an event is created. Off by
     # default for the same reason sending is: it leaves the machine.
     calendar_send_invites: bool = False
@@ -128,24 +119,9 @@ class Settings(BaseSettings):
         return Path(self.google_token_file or (MODULE_DIR / "token.json"))
 
     @property
-    def workday(self) -> tuple[time, time]:
-        """(start, end) as local wall-clock times. A bad value falls back."""
-        return _parse_hhmm(self.calendar_workday_start, time(9, 0)), _parse_hhmm(
-            self.calendar_workday_end, time(18, 0)
-        )
-
-    @property
     def slack_channels(self) -> set[str]:
         """Empty set means: every public channel the bot has joined."""
         return {c.strip() for c in self.slack_channel_allowlist.split(",") if c.strip()}
-
-
-def _parse_hhmm(value: str, fallback: time) -> time:
-    try:
-        hours, minutes = value.strip().split(":")
-        return time(int(hours), int(minutes))
-    except (AttributeError, TypeError, ValueError):
-        return fallback
 
 
 def load_settings() -> Settings:

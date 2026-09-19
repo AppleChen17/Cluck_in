@@ -29,13 +29,10 @@ from fastapi import FastAPI, HTTPException, Query
 import normalize
 from buffer import MessageBuffer, encode_cursor, parse_cursor
 from config import Settings, load_settings
-from gcal.availability import format_slots, free_slots
 from gcal.base import CalendarBackend, CalendarError
 from idempotency import OnceByKey
 from reply_registry import ReplyRegistry, target_from_message
 from schemas import (
-    AvailabilityRequest,
-    AvailabilityResponse,
     CalendarStatus,
     CreateEventRequest,
     EventsResponse,
@@ -49,7 +46,6 @@ from schemas import (
     SendResult,
     SendingStatus,
     SlackSendRequest,
-    SlotModel,
 )
 from sender.base import Dispatcher, SendBlocked, SendUnavailable
 from sender.gmail_sender import GmailSender, build_references, build_reply_subject
@@ -398,52 +394,6 @@ def get_outbox(limit: int = Query(default=50, ge=1, le=500)) -> OutboxResponse:
 
 
 # -- calendar -----------------------------------------------------------------
-
-
-@app.post("/calendar/availability", response_model=AvailabilityResponse)
-def availability(request: AvailabilityRequest) -> AvailabilityResponse:
-    """When you are free, as slots and as a sentence.
-
-    `text` exists so the model quotes an answer instead of computing one. Ask a
-    3b model which half-hours next Tuesday are free given nine busy blocks and
-    it will confidently invent one.
-    """
-    start = _now() + timedelta(minutes=settings.calendar_lead_minutes)
-    end = _now() + timedelta(days=request.withinDays)
-    workday_start, workday_end = settings.workday
-    try:
-        busy = _calendar().busy(start, end)
-    except CalendarError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    slots = free_slots(
-        busy,
-        window_start=start,
-        window_end=end,
-        duration_minutes=request.durationMinutes,
-        workday_start=workday_start,
-        workday_end=workday_end,
-        weekdays_only=settings.calendar_weekdays_only,
-        granularity_minutes=settings.calendar_slot_granularity_minutes,
-        limit=request.limit,
-    )
-    text = format_slots(slots) or "接下來 {} 天內都沒有空檔".format(
-        request.withinDays
-    )
-    return AvailabilityResponse(
-        slots=[
-            SlotModel(
-                start=normalize.to_rfc3339(s.start, settings.external_tz),
-                end=normalize.to_rfc3339(s.end, settings.external_tz),
-            )
-            for s in slots
-        ],
-        text=text,
-        durationMinutes=request.durationMinutes,
-        searchedFrom=normalize.to_rfc3339(start, settings.external_tz),
-        searchedTo=normalize.to_rfc3339(end, settings.external_tz),
-        backend=_calendar().name,
-    )
 
 
 @app.get("/calendar/events", response_model=EventsResponse)

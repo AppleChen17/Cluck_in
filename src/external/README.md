@@ -84,14 +84,15 @@ Slack workspace and a real Google Calendar, not only against the test suite:
 | Slack Socket Mode in, `chat.postMessage` and `reactions.add` out | works |
 | Gmail IMAP in, SMTP out, copy filed in Sent | works |
 | Reply threading (`In-Reply-To` on a real send) | works |
-| `freebusy`, `events.list`, `events.insert` | works |
+| `events.list`, `events.insert` | works |
 | One reply per message, one event per `fromMessageId` | both triggered and held |
 
-Two things that only showed up once real credentials were involved, and that no
-test would have caught, are written up under **Known limitations** below:
-`freebusy` needs a scope the other calls do not, and a calendar whose own
-timezone setting is wrong displays every event at the wrong hour while storing
-the right instant.
+One thing that only showed up once real credentials were involved, and that no
+test would have caught, is written up under **Known limitations** below: a
+calendar whose own timezone setting is wrong displays every event at the wrong
+hour while storing the right instant. (A second, `freebusy` needing a scope the
+other calls do not, went away with the availability feature — the scope is still
+requested so existing tokens stay valid.)
 
 ## Tests
 
@@ -130,7 +131,6 @@ strict C# deserializer would otherwise reject at runtime.
 | `sender/outbox.py` | What was sent or would have been; one reply per message, ever |
 | `sender/gmail_sender.py` | SMTP send, RFC 822 threading, filing a copy in Sent |
 | `sender/slack_sender.py` | `chat.postMessage` and `reactions.add` |
-| `gcal/availability.py` | Pure: free slots from busy blocks. No network, no state |
 | `gcal/memory_calendar.py` | In-process calendar, needs no credentials |
 | `gcal/google_calendar.py` | Google Calendar API v3 |
 | `scripts/setup_google_oauth.py` | One-off OAuth, see `docs/Setup.md` |
@@ -169,13 +169,14 @@ The three are chosen deliberately:
 
 | | The chicken |
 |---|---|
-| "什麼時候有空？" | checks the calendar, answers with real slots |
-| "我們約在下週二下午三點開會" | reacts 👍 and adds the calendar entry |
+| "我們約在下週二下午三點開會" | reacts 👍, adds the entry, says which time |
+| "附件是上週的會議紀錄，有空再看" | **does nothing** — a meeting with no time |
 | "下週一開始咖啡機移到二樓" | **does nothing** |
 
-The third is the one worth showing. An assistant that answers everything is not
-trustworthy; the demo should prove it declines to speak when it has nothing to
-add.
+Two of the three produce nothing, and that is the point. The second is the
+sharper one: it talks about a meeting and still gets no calendar entry, because
+it names no time. An assistant that answers everything is not trustworthy, and
+one that invents a time it did not read is worse.
 
 `--reply-to you@gmail.com` to point the email at yourself for a live run.
 
@@ -186,9 +187,6 @@ The loop, in a straight line:
 ```
 GET /messages            what arrived
   classify intent        local model, or keywords if it is not running
-asking when you are free:
-  POST /calendar/availability    real free slots, computed not guessed
-  POST /reply                    answer in the same thread
 telling you about a meeting:
   POST /react                    a thumbs up is a real answer
   POST /calendar/events          put it on the calendar
@@ -202,10 +200,9 @@ before that side is ready.
 
 Two things it does on purpose, both worth copying into the C# side:
 
-- **The reply is a template wrapped around `/calendar/availability`'s `text`,
-  not model-generated.** The slots are the part that has to be right, and they
-  came from real arithmetic; letting a 3b model restate them is how 14:00
-  becomes 15:00.
+- **The confirmation quotes the time read back from the created event**, not the
+  time it asked for. That catches a timezone mistake of our own as well as a bad
+  extraction by the model.
 - **An extracted meeting time is validated before use.** No offset, unparseable,
   or in the past means no calendar entry and a line saying so. Models reach for
   the current year and last week's weekday; a meeting on the wrong day is worse

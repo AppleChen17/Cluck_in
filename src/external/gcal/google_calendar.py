@@ -31,10 +31,13 @@ log = logging.getLogger("external.gcal")
 #
 #   calendar.events    read and write events. Enough for events.list and
 #                      events.insert, and NOT enough for anything else.
-#   calendar.readonly  freebusy.query. It refuses calendar.events alone with
-#                      403 "Request had insufficient authentication scopes",
-#                      which reads like a project misconfiguration rather than
-#                      a missing scope.
+#   calendar.readonly  NOT used by anything here any more. It was needed by
+#                      freebusy.query, which went with the availability
+#                      feature; freebusy refuses calendar.events alone with a
+#                      403 whose message says nothing about scopes. Kept so an
+#                      already-issued token.json stays valid -- narrowing this
+#                      list invalidates it and forces a re-authorization.
+#                      Drop it on the next scope change, not before.
 #
 # Deliberately not the full "calendar" scope, which would also grant deleting
 # calendars outright. This pair is read-everything plus write-events-only.
@@ -166,31 +169,6 @@ class GoogleCalendar(CalendarBackend):
             raise CalendarError("{}: {}{}".format(type(exc).__name__, exc, hint)) from exc
 
     # -- reads ----------------------------------------------------------------
-
-    def busy(self, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-        """freebusy, not events.list: one call, already merged, and it reports
-        blocks from calendars whose event details we are not allowed to read."""
-        body = {
-            "timeMin": _rfc3339(start),
-            "timeMax": _rfc3339(end),
-            "items": [{"id": self._cfg.calendar_id}],
-        }
-        response = self._call(self._client().freebusy().query(body=body))
-        entry = (response.get("calendars") or {}).get(self._cfg.calendar_id) or {}
-        for error in entry.get("errors") or []:
-            # Reported, never swallowed: an empty busy list and a calendar we
-            # were not allowed to read look identical, and one of them would
-            # have us offer a slot that is already taken.
-            raise CalendarError(
-                "freebusy failed for {}: {}".format(self._cfg.calendar_id, error.get("reason"))
-            )
-        out = []
-        for period in entry.get("busy") or []:
-            begins = normalize.parse_rfc3339(period.get("start", ""))
-            ends = normalize.parse_rfc3339(period.get("end", ""))
-            if begins is not None and ends is not None:
-                out.append((begins, ends))
-        return out
 
     def events(self, start: datetime, end: datetime) -> list[ExternalEvent]:
         response = self._call(

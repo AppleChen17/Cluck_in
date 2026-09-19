@@ -13,12 +13,12 @@ so the feature can be seen working and rehearsed today.
 
     GET  /messages                  what arrived
       -> classify intent            local model, or keywords if it is not running
-    asking when you are free:
-      POST /calendar/availability   real free slots, computed not guessed
-      POST /reply                   answer in the same thread / mail thread
     telling you about a meeting:
       POST /react                   a thumbs up is a real answer
       POST /calendar/events         put it on the calendar
+      POST /reply                   say which time went on it
+    anything else:
+      nothing at all
 
 Usage, from the repo root, with the service already running on :8100:
 
@@ -68,7 +68,7 @@ INTENT_FORMAT = {
         "reason": {"type": "string"},
         "intent": {
             "type": "string",
-            "enum": ["asking_availability", "meeting_invite", "other"],
+            "enum": ["meeting_invite", "other"],
         },
         "startTime": {"type": "string"},
         "durationMinutes": {"type": "number"},
@@ -79,11 +79,10 @@ INTENT_FORMAT = {
 
 SYSTEM_PROMPT = """You read one incoming message and label what the sender wants.
 
-asking_availability = they are ASKING when the reader is free, or asking to find
-  a time. They have not named a specific time yet.
 meeting_invite = they are TELLING the reader about a specific time that is
   already decided, or proposing one concrete time.
-other = anything else at all. When unsure, answer other.
+other = anything else at all, INCLUDING a message that only asks to find a time
+  without naming one. When unsure, answer other.
 
 For meeting_invite only, also extract:
   startTime = the meeting start as an ISO 8601 datetime with the SAME offset as
@@ -116,11 +115,6 @@ def build_prompt(message: dict, now: datetime) -> str:
 # The fallback when Ollama is not running. Crude on purpose: it is there so the
 # demo degrades to something visible instead of dying on stage, not so anyone
 # ships it. A question mark next to a time word is most of the signal.
-_ASKING_HINTS = (
-    "什麼時候有空", "有空嗎", "方便嗎",
-    "什麼時間方便", "約個時間", "約時間",
-    "when are you free", "are you available", "what time works", "find a time",
-)
 _INVITE_HINTS = (
     "開會", "會議", "約在", "定在", "meeting",
     "let us meet", "scheduled for", "安排在",
@@ -129,15 +123,6 @@ _INVITE_HINTS = (
 
 def classify_by_keywords(message: dict) -> dict:
     text = "{} {}".format(message.get("title") or "", message.get("content") or "").lower()
-    for hint in _ASKING_HINTS:
-        if hint.lower() in text:
-            return {
-                "intent": "asking_availability",
-                "reason": "keyword fallback: {!r}".format(hint),
-                "startTime": "",
-                "durationMinutes": 0,
-                "title": "",
-            }
     for hint in _INVITE_HINTS:
         if hint.lower() in text:
             # No time extraction without a model: say so rather than guess. The
@@ -197,24 +182,6 @@ def classify(message: dict, args) -> dict:
 
 
 # -- the three things it can do -----------------------------------------------
-
-
-def answer_with_availability(message: dict, args) -> None:
-    result = request_json(
-        args.external_url + "/calendar/availability",
-        {"durationMinutes": args.duration, "withinDays": args.within_days, "limit": 3},
-    )
-    # Composed from a template, not generated. The slots are the part that must
-    # be right, and they came from real calendar arithmetic; letting a 3b model
-    # rewrite them is how 14:00 becomes 15:00.
-    body = "你好，這幾個時段我可以：\n{}\n\n方便的話回我一句，我再發會議邀請。\n\n（由 Cluck In 自動回覆）".format(
-        result["text"]
-    )
-    print("  slots: {}".format(result["text"].replace("\n", " / ")))
-    sent = request_json(
-        args.external_url + "/reply", {"messageId": message["id"], "body": body}
-    )
-    _report_send(sent)
 
 
 _WEEKDAY_ZH = "一二三四五六日"
@@ -353,9 +320,7 @@ def handle(message: dict, args) -> None:
     print("  intent={} ({})".format(intent.get("intent"), intent.get("reason", "")[:80]))
 
     try:
-        if intent.get("intent") == "asking_availability":
-            answer_with_availability(message, args)
-        elif intent.get("intent") == "meeting_invite":
+        if intent.get("intent") == "meeting_invite":
             acknowledge_meeting(message, intent, args)
         else:
             print("  nothing to do")
@@ -376,8 +341,6 @@ def main() -> int:
     parser.add_argument("--once", action="store_true", help="one pass, then exit")
     parser.add_argument("--interval", type=float, default=5.0)
     parser.add_argument("--timeout", type=float, default=60.0)
-    parser.add_argument("--duration", type=int, default=30, help="meeting length to offer")
-    parser.add_argument("--within-days", type=int, default=5)
     args = parser.parse_args()
     args.external_url = args.external_url.rstrip("/")
 

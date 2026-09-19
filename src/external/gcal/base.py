@@ -24,10 +24,6 @@ class CalendarBackend(ABC):
     name: str = "calendar"
 
     @abstractmethod
-    def busy(self, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-        """Occupied intervals overlapping [start, end). Order is not guaranteed."""
-
-    @abstractmethod
     def events(self, start: datetime, end: datetime) -> list[ExternalEvent]:
         """Events overlapping [start, end), oldest first."""
 

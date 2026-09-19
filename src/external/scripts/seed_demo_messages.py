@@ -11,13 +11,14 @@ The messages here carry ids and metadata that route, so POST /reply works.
 
 Three messages, on purpose:
 
-  1. asking when you are free   -> the chicken checks the calendar and answers
-  2. naming a meeting time      -> the chicken reacts and adds a calendar entry
+  1. naming a meeting time      -> the chicken reacts and adds a calendar entry
+  2. mentioning a meeting with no time -> the chicken does NOTHING
   3. an announcement            -> the chicken does NOTHING
 
-The third is the one worth showing. An assistant that answers everything is not
-trustworthy; the demo should prove it declines to speak when it has nothing to
-add.
+Two of the three produce nothing, and that is the point. The second is the
+sharper one: it talks about a meeting and still gets no calendar entry, because
+it names no time. An assistant that answers everything is not trustworthy, and
+one that invents a time it did not read is worse.
 
     .\\.venv\\Scripts\\python.exe src\\external\\scripts\\seed_demo_messages.py
     .\\.venv\\Scripts\\python.exe src\\external\\scripts\\seed_demo_messages.py --reply-to you@gmail.com
@@ -44,15 +45,14 @@ def messages(reply_to: str, channel: str, stamp: str, now: datetime) -> list[dic
     when = now.isoformat(timespec="seconds")
     return [
         {
-            "id": "gmail:demo-availability-{}@example.com".format(stamp),
+            "id": "gmail:demo-noise-{}@example.com".format(stamp),
             "source": "gmail",
             "sender": "Alice Chen",
-            "title": "想跟你討論 Cluck In 的 demo",
+            "title": "上週會議紀錄",
             "content": (
-                "你好，想跟你約個時間討論 "
-                "Cluck In 的 demo 流程，請問你最近"
-                "什麼時候有空？大概半小時"
-                "就好。"
+                "你好，附件是上週的會議"
+                "紀錄，有空再看就好，"
+                "不急。"
             ),
             "timestamp": when,
             "unread": True,

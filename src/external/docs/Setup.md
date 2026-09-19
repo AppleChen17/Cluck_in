@@ -186,9 +186,8 @@ worth knowing that before spending an hour looking for one.
 
 **You can skip this entirely.** `CALENDAR_BACKEND=memory` (the default) keeps
 events in the process, which is enough to develop against and enough to demo the
-whole flow — the availability arithmetic, the API shapes and the tests are
-identical either way. The only thing you lose is events actually appearing in
-your real Google Calendar.
+whole flow — the API shapes and the tests are identical either way. The only
+thing you lose is events actually appearing in your real Google Calendar.
 
 ### 1. In the Google Cloud console — about ten minutes, once
 
@@ -245,18 +244,16 @@ worth re-running the script the morning of a demo regardless.
 
 ### What the backend does and does not do
 
-- `busy()` uses **freebusy**, not `events.list`: one call, already merged, and
-  it reports blocks from calendars whose event details you are not allowed to
-  read. A calendar that cannot be read raises rather than returning "free" —
-  offering a slot that is already taken is worse than an error.
 - **All-day events are skipped.** They have no time and no offset, the
   `ExternalEvent` contract requires a full date-time, and `docs/data-contracts.md`
   defers all-day handling. Coercing one to midnight would block the whole day.
 - Two scopes are requested: `calendar.events` (read and write events) and
-  `calendar.readonly` (which `freebusy.query` requires — it rejects
-  `calendar.events` alone with a `403` whose message says nothing about
-  scopes). Deliberately not the full `calendar` scope, which would also allow
-  deleting calendars. Neither can reach your Gmail, Drive or contacts.
+  `calendar.readonly`, which nothing uses any more — it was needed by
+  `freebusy.query`, which went with the availability feature. It is kept only
+  so an already-issued `token.json` stays valid; narrowing the list invalidates
+  it and forces everyone to re-authorize. Drop it at the next scope change.
+  Deliberately not the full `calendar` scope, which would also allow deleting
+  calendars. None of them can reach your Gmail, Drive or contacts.
 - **Changing the scope list invalidates an existing `token.json`.** Delete it
   and re-run the setup script; the error message from this module says so.
 - Revoke it any time at <https://myaccount.google.com/permissions>.
@@ -392,9 +389,9 @@ call.
 And the calendar:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8100/calendar/availability `
-  -ContentType 'application/json' -Body '{"durationMinutes":30}'
+Invoke-RestMethod "http://127.0.0.1:8100/calendar/events?withinDays=7" | ConvertTo-Json -Depth 5
 ```
 
-`text` should read like something you would actually send someone, and no slot
-should collide with anything on your calendar.
+The events you see should be the ones on your real calendar, with offsets like
+`+08:00`. If the list is empty and your calendar is not, check `calendar.backend`
+in `/health` — `google` with no token silently falls back to `memory`.

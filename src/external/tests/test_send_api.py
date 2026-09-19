@@ -258,27 +258,6 @@ def test_an_injected_email_needs_an_address_to_be_replyable(client):
 # -- calendar -----------------------------------------------------------------
 
 
-def test_availability_returns_slots_and_a_sentence(client):
-    body = client.post("/calendar/availability", json={"durationMinutes": 30}).json()
-    assert body["backend"] == "memory"
-    assert body["durationMinutes"] == 30
-    assert body["text"]
-    for slot in body["slots"]:
-        assert slot["start"] < slot["end"]
-
-
-def test_availability_never_proposes_a_slot_before_the_lead_time(monkeypatch):
-    """Offering a meeting eight minutes from now reads as a bug."""
-    with build_client(monkeypatch, calendar_lead_minutes=600) as client:
-        body = client.post("/calendar/availability", json={}).json()
-        for slot in body["slots"]:
-            assert slot["start"] >= body["searchedFrom"]
-
-
-def test_availability_rejects_an_absurd_duration(client):
-    assert client.post("/calendar/availability", json={"durationMinutes": 5000}).status_code == 422
-
-
 def _tomorrow_afternoon() -> tuple[str, str]:
     """Relative to now, never a hardcoded date: a fixed date drifts into the
     past and the test starts failing on a day nobody touched the code."""
@@ -321,20 +300,6 @@ def test_an_event_outside_the_window_is_not_listed(client):
         },
     )
     assert client.get("/calendar/events", params={"withinDays": 60}).json()["count"] == 0
-
-
-def test_a_created_event_blocks_the_slot_it_occupies(client):
-    """The loop that matters: accept a meeting, stop offering that time."""
-    before = client.post("/calendar/availability", json={"durationMinutes": 30, "limit": 20}).json()
-    if not before["slots"]:
-        pytest.skip("no free slots in the window right now")
-    taken = before["slots"][0]
-    client.post(
-        "/calendar/events",
-        json={"title": "Taken", "startTime": taken["start"], "endTime": taken["end"]},
-    )
-    after = client.post("/calendar/availability", json={"durationMinutes": 30, "limit": 20}).json()
-    assert taken not in after["slots"]
 
 
 @pytest.mark.parametrize(
