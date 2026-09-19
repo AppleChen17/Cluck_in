@@ -117,6 +117,26 @@ def _is_seen(prelude) -> bool:
     return bool(match) and "\\seen" in match.group(1).lower()
 
 
+def _arrival_epoch(prelude) -> float | None:
+    """Server-side arrival time (INTERNALDATE) as epoch seconds, or None.
+
+    Arrival, not the Date header: a delayed mail can carry a send time from
+    before startup and still land in the mailbox afterwards, and it is the
+    arrival that interrupts you. INTERNALDATE is also the one timestamp a
+    sender cannot forge.
+    """
+    if not prelude:
+        return None
+    raw = prelude if isinstance(prelude, bytes) else str(prelude).encode()
+    stamp = imaplib.Internaldate2tuple(raw)
+    if not stamp:
+        return None
+    try:
+        return time.mktime(stamp)
+    except (OverflowError, ValueError):
+        return None
+
+
 def _build_id(msg, uid: str, uidvalidity: str) -> str:
     raw = (msg.get("Message-ID") or "").strip()
     if raw:
@@ -157,10 +177,14 @@ class GmailAdapter(SourceAdapter):
         self._cfg = cfg
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Set in start(); messages that arrived before it are not this session's.
+        self._started_at: float | None = None
 
     def start(self, sink: MessageSink) -> None:
         if not self._cfg.gmail_address or not self._cfg.gmail_app_password:
             raise ValueError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD are required")
+        if self._cfg.gmail_only_since_startup:
+            self._started_at = time.time()
         self._thread = threading.Thread(
             target=self._run, args=(sink,), daemon=True, name="gmail-poll"
         )
@@ -248,6 +272,9 @@ class GmailAdapter(SourceAdapter):
         for item in data:
             if not isinstance(item, tuple) or len(item) < 2:
                 continue
+            arrived = _arrival_epoch(item[0]) if self._started_at is not None else None
+            if arrived is not None and arrived < self._started_at:
+                continue
             try:
                 message = build_message(
                     raw=item[1],
@@ -265,5 +292,12 @@ class GmailAdapter(SourceAdapter):
                 self._mark_error("parse uid {!r}: {}: {}".format(uid, type(exc).__name__, exc))
                 log.exception("failed to normalize message uid=%r", uid)
                 continue
+            if self._started_at is not None and arrived is None:
+                # No usable INTERNALDATE: fall back to the send time. If that is
+                # unreadable too, let it through -- dropping a message we cannot
+                # place in time is worse than showing one extra.
+                sent = normalize.parse_rfc3339(message.timestamp)
+                if sent is not None and sent.timestamp() < self._started_at:
+                    continue
             if sink(message):
                 self._mark_emitted(message.timestamp)

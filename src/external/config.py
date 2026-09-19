@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # false to take everything from the last GMAIL_SINCE_DAYS days instead;
     # dedup by message id stops anything being emitted twice either way.
     gmail_only_unseen: bool = True
+    # True delivers only mail that ARRIVES after this process starts, matching
+    # Slack, where Socket Mode delivers nothing from before it connected. False
+    # takes everything from the last GMAIL_SINCE_DAYS days, which fills the
+    # dashboard immediately but shows mail from before the session began.
+    gmail_only_since_startup: bool = True
 
     slack_enabled: bool = False
     slack_bot_token: str = ""

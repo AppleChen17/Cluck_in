@@ -6,10 +6,12 @@ than as .eml fixtures so each test is self-describing (and .eml is gitignored).
 
 import base64
 import quopri
+import time
+from datetime import datetime, timezone
 
 import pytest
 
-from adapters.gmail_adapter import build_message
+from adapters.gmail_adapter import GmailAdapter, _arrival_epoch, build_message
 
 
 def canned(headers: str, body: bytes) -> bytes:
@@ -291,3 +293,98 @@ Content-Type: text/plain; charset="utf-8"
             "於 2026年9月19日週六 下午3:59寫道：\r\n> good morning\r\n".encode("utf-8"),
         )
         assert build_message(raw, uid="186", uidvalidity="1").content == "lalalalalala reply"
+
+
+# -- only this session's mail -------------------------------------------------
+#
+# GMAIL_ONLY_SINCE_STARTUP mirrors Slack, where Socket Mode delivers nothing
+# from before it connected. The cut uses INTERNALDATE (when the server received
+# the mail), not the Date header: a delayed mail can carry a send time from
+# before startup and still land afterwards, and it is the arrival that
+# interrupts you.
+
+PRELUDE = b'186 (FLAGS () INTERNALDATE "19-Sep-2026 09:31:00 +0000" BODY[] {123}'
+
+
+def test_arrival_epoch_reads_internaldate():
+    epoch = _arrival_epoch(PRELUDE)
+    assert epoch is not None
+    assert datetime.fromtimestamp(epoch, tz=timezone.utc) == datetime(
+        2026, 9, 19, 9, 31, tzinfo=timezone.utc
+    )
+
+
+@pytest.mark.parametrize("prelude", [b"", None, b"186 (FLAGS ())", b"garbage"])
+def test_arrival_epoch_returns_none_when_unreadable(prelude):
+    assert _arrival_epoch(prelude) is None
+
+
+def _prelude(when: datetime) -> bytes:
+    stamp = when.astimezone(timezone.utc).strftime("%d-%b-%Y %H:%M:%S +0000")
+    return b'1 (FLAGS () INTERNALDATE "' + stamp.encode() + b'" BODY[] {1}'
+
+
+class _FakeConn:
+    """Serves one canned message with a chosen INTERNALDATE."""
+
+    def __init__(self, arrived: datetime):
+        self._prelude = _prelude(arrived)
+
+    def uid(self, command, *args):
+        if command == "FETCH":
+            return "OK", [(self._prelude, PLAIN_UTF8)]
+        return "OK", [b""]
+
+
+def _run_fetch(arrived_offset_seconds: int, only_since_startup: bool = True):
+    from config import Settings
+
+    adapter = GmailAdapter(Settings(
+        _env_file=None,
+        gmail_address="a@example.com",
+        gmail_app_password="x" * 16,
+        gmail_only_since_startup=only_since_startup,
+    ))
+    now = time.time()
+    adapter._started_at = now if only_since_startup else None
+    delivered = []
+    adapter._fetch_one(
+        _FakeConn(datetime.fromtimestamp(now + arrived_offset_seconds, tz=timezone.utc)),
+        b"1", "1", lambda m: delivered.append(m) or True,
+    )
+    return delivered
+
+
+def test_mail_that_arrived_before_startup_is_dropped():
+    assert _run_fetch(arrived_offset_seconds=-3600) == []
+
+
+def test_mail_that_arrived_after_startup_is_delivered():
+    assert len(_run_fetch(arrived_offset_seconds=+60)) == 1
+
+
+class _NoDateConn:
+    """A FETCH response whose prelude carries no usable INTERNALDATE."""
+
+    def uid(self, command, *args):
+        if command == "FETCH":
+            return "OK", [(b"1 (FLAGS () BODY[] {1}", PLAIN_UTF8)]
+        return "OK", [b""]
+
+
+def test_unreadable_internaldate_falls_back_to_the_send_time():
+    """PLAIN_UTF8 was sent 2026-09-19T11:31+08:00, long before the watermark."""
+    from config import Settings
+
+    adapter = GmailAdapter(Settings(
+        _env_file=None, gmail_address="a@example.com", gmail_app_password="x" * 16,
+    ))
+    adapter._started_at = time.time()
+    delivered = []
+    adapter._fetch_one(_NoDateConn(), b"1", "1", lambda m: delivered.append(m) or True)
+    assert delivered == []
+
+
+def test_the_setting_can_be_turned_off():
+    """False restores the old behaviour: everything within GMAIL_SINCE_DAYS."""
+    assert len(_run_fetch(arrived_offset_seconds=-3600, only_since_startup=False)) == 1
