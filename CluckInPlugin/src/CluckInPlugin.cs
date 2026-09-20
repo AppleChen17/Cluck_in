@@ -25,6 +25,8 @@
         // This method is called when the plugin is loaded.
         public override void Load()
         {
+            PluginLog.Info($"Plugin runtime loaded: mvid={this.Assembly.ManifestModule.ModuleVersionId}, " +
+                $"baseDirectory={AppContext.BaseDirectory}");
             IdleChickenAnimation.Start();
             FocusChickenAnimation.Start();
         }

@@ -101,6 +101,7 @@ Check(!(await agent.GetContextAsync()).FocusModeEnabled && timer.GetCurrentSessi
 Console.WriteLine($"Passed {assertions} Desktop Agent checks.");
 ProgressTrackingChecks.Run();
 await ProgressTrackingChecks.CheckDeliveryAsync();
+await ProgressTrackingChecks.CheckProductionPathAsync();
 await ViewModelChecks.RunAsync();
 await TaskChecks.RunAsync();
 await InterventionChecks.RunAsync();

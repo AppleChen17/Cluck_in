@@ -18,11 +18,21 @@ class ChickenStatistics:
     def __init__(self, path: Path | None = None):
         self.path = path
         self.data = {"feedCount": 0, "patCount": 0, "successfulFeedCount": 0,
-                     "totalFocusSeconds": 0, "focusSessions": {}}
+                     "totalFocusSeconds": 0, "focusFeedRewardsGranted": 0,
+                     "focusSessions": {}}
         if path is not None and path.exists():
-            self.data.update(json.loads(path.read_text(encoding="utf-8")))
-            for key in ("feedCount", "patCount", "successfulFeedCount", "totalFocusSeconds"):
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.data.update(saved)
+            # Existing state may already contain completion-based feed rewards. Mark
+            # its elapsed milestones as processed so an upgrade cannot award them
+            # again; subsequent focus continues from the saved remainder.
+            if "focusFeedRewardsGranted" not in saved:
+                self.data["focusFeedRewardsGranted"] = self.data["totalFocusSeconds"] // 5
+            for key in ("feedCount", "patCount", "successfulFeedCount", "totalFocusSeconds",
+                        "focusFeedRewardsGranted"):
                 self._integer(self.data[key])
+            if self.data["focusFeedRewardsGranted"] > self.data["totalFocusSeconds"] // 5:
+                raise ValueError("Focus reward ledger exceeds accumulated focus time")
 
     @staticmethod
     def _integer(value):
@@ -69,12 +79,15 @@ class ChickenStatistics:
             raise ValueError("Invalid focus completion")
         previous = self.data["focusSessions"].get(session_id, {"seconds": 0, "completed": False})
         maximum = max(seconds, previous["seconds"])
-        earned = completed and not previous["completed"]
-        if maximum == previous["seconds"] and not earned:
+        newly_completed = completed and not previous["completed"]
+        if maximum == previous["seconds"] and not newly_completed:
             return
         data = copy.deepcopy(self.data)
         data["totalFocusSeconds"] += maximum - previous["seconds"]
-        data["feedCount"] += int(earned)
+        reached = data["totalFocusSeconds"] // 5
+        earned = reached - data["focusFeedRewardsGranted"]
+        data["feedCount"] += earned
+        data["focusFeedRewardsGranted"] = reached
         data["focusSessions"][session_id] = {
             "seconds": maximum, "completed": completed or previous["completed"]}
         self._commit(data)

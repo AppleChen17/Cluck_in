@@ -26,7 +26,7 @@ class IdleStateTests(unittest.TestCase):
         self.assertEqual(anim.mood, "feed")
         self.assertEqual(anim.feed_count, 0)
         self.assertEqual(anim.get_view()["successfulFeedCount"], 1)
-        for _ in range(FRAME_COUNTS["feed"]):
+        for _ in range(FRAME_COUNTS["feed"] * 2):
             anim.handle_event("tick")
         self.assertEqual(anim.mood, "idle")
         for value in (-1, True, 1.5):
@@ -38,7 +38,7 @@ class IdleStateTests(unittest.TestCase):
             path = Path(directory) / "state.json"
             anim = ChickenAnim(ChickenStatistics(path))
             anim.handle_event("RECORD_FOCUS", {"sessionId": "a", "seconds": 12, "completed": False})
-            self.assertEqual(anim.feed_count, 0)
+            self.assertEqual(anim.feed_count, 2)
             anim.handle_event("RECORD_FOCUS", {"sessionId": "a", "seconds": 20, "completed": True})
             anim.handle_event("PET_CHICKEN")
             anim.handle_event("FEED_CHICKEN")
@@ -47,21 +47,81 @@ class IdleStateTests(unittest.TestCase):
             restored.handle_event("RECORD_FOCUS", {"sessionId": "a", "seconds": 5, "completed": False})
             restored.handle_event("RECORD_FOCUS", {"sessionId": "early-stop", "seconds": 3, "completed": False})
             self.assertEqual(restored.statistics.snapshot(), {
-                "feedCount": 0, "patCount": 1, "successfulFeedCount": 1, "totalFocusSeconds": 23})
+                "feedCount": 3, "patCount": 1, "successfulFeedCount": 1, "totalFocusSeconds": 23})
             before = path.read_bytes()
             restored.handle_event("tick")
             self.assertEqual(path.read_bytes(), before)
 
+    def test_focus_feed_rewards_follow_cumulative_five_second_milestones(self):
+        for seconds, expected in ((0, 0), (4, 0), (5, 1), (9, 1), (10, 2), (11, 2)):
+            with self.subTest(seconds=seconds):
+                statistics = ChickenStatistics()
+                statistics.record_focus("session", seconds, False)
+                self.assertEqual(statistics.snapshot()["feedCount"], expected)
+
+        statistics = ChickenStatistics()
+        statistics.record_focus("first", 3, True)
+        statistics.record_focus("second", 2, False)
+        self.assertEqual(statistics.snapshot()["feedCount"], 1)
+
+        statistics = ChickenStatistics()
+        statistics.record_focus("first", 8, True)
+        statistics.record_focus("second", 2, False)
+        self.assertEqual(statistics.snapshot()["feedCount"], 2)
+
+        statistics = ChickenStatistics()
+        statistics.record_focus("session", 4, False)
+        statistics.record_focus("session", 11, False)
+        self.assertEqual(statistics.snapshot()["feedCount"], 2)
+        statistics.record_focus("session", 11, False)
+        self.assertEqual(statistics.snapshot()["feedCount"], 2)
+
+    def test_focus_feed_rewards_are_idempotent_and_survive_restart_and_consumption(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            statistics = ChickenStatistics(path)
+            statistics.record_focus("session", 11, False)
+            statistics.record_focus("session", 11, False)
+            self.assertEqual(statistics.snapshot()["feedCount"], 2)
+
+            restarted = ChickenStatistics(path)
+            restarted.record_focus("session", 11, False)
+            self.assertEqual(restarted.snapshot()["feedCount"], 2)
+            restarted.record_focus("session", 15, True)
+            self.assertEqual(restarted.snapshot()["feedCount"], 3)
+
+            self.assertTrue(restarted.consume_feed())
+            restarted.record_focus("session", 15, True)
+            self.assertEqual(restarted.snapshot()["feedCount"], 2)
+
+    def test_old_statistics_state_does_not_reaward_processed_focus(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            path.write_text(json.dumps({
+                "feedCount": 1,
+                "patCount": 0,
+                "successfulFeedCount": 0,
+                "totalFocusSeconds": 11,
+                "focusSessions": {"old": {"seconds": 11, "completed": True}},
+            }), encoding="utf-8")
+            statistics = ChickenStatistics(path)
+            self.assertEqual(statistics.data["focusFeedRewardsGranted"], 2)
+            statistics.record_focus("old", 11, True)
+            self.assertEqual(statistics.snapshot()["feedCount"], 1)
+            statistics.record_focus("new", 4, False)
+            self.assertEqual(statistics.snapshot()["feedCount"], 2)
+
     def test_existing_animation_transitions(self):
         anim = ChickenAnim()
-        self.assertEqual([anim.handle_event("tick")["chicken"] for _ in range(4)],
+        idle_frames = [anim.handle_event("tick")["chicken"] for _ in range(16)]
+        self.assertEqual(idle_frames[3::4],
                          ["idle_01.png", "idle_02.png", "idle_03.png", "idle_00.png"])
         anim.handle_event("START_FOCUS")
         anim.handle_event("PET_CHICKEN")
         for _ in range(FRAME_COUNTS["pet"]): anim.handle_event("tick")
         self.assertEqual(anim.mood, "focused")
         anim.handle_event("PAUSE_FOCUS")
-        self.assertEqual(anim.get_view()["displayKey"], 6)
+        self.assertEqual(anim.get_view()["displayKey"], 5)
 
     def test_common_crop_keeps_every_visible_pixel(self):
         crop = idle_crop()
@@ -78,7 +138,8 @@ class IdleStateTests(unittest.TestCase):
     def test_shared_schemas_and_fixtures(self):
         root = Path(__file__).resolve().parents[2]
         for kind in ("view", "event"):
-            schema = json.loads((root / f"shared/schemas/chicken-{kind}.schema.json").read_text())
+            schema = json.loads((root / f"shared/schemas/chicken-{kind}.schema.json").read_text(
+                encoding="utf-8"))
             validator = Draft202012Validator(schema)
             validator.check_schema(schema)
             for fixture in (root / "shared/fixtures").glob(f"chicken-{kind}-*.json"):

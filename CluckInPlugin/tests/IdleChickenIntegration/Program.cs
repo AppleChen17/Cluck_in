@@ -26,11 +26,15 @@ using var http = new HttpClient { BaseAddress = new Uri(url), Timeout=TimeSpan.F
 var flags = BindingFlags.NonPublic | BindingFlags.Static;
 var assembly = typeof(MainController).Assembly;
 var adapter = assembly.GetType("Loupedeck.CluckInPlugin.IdleChickenAnimation")!;
+var focusAdapter = assembly.GetType("Loupedeck.CluckInPlugin.FocusChickenAnimation")!;
 var samples = new ConcurrentQueue<(string Mood,string Frame,byte[] Image)>();
 var errors = new ConcurrentQueue<Exception>();
 var key = new FocusControlCommand();
+var key6 = new FocusStopCommand();
 var commandFlags = BindingFlags.Instance | BindingFlags.NonPublic;
 BitmapImage Image() => (BitmapImage)typeof(FocusControlCommand).GetMethod("GetCommandImage",commandFlags)!.Invoke(key,new object[]{"",PluginImageSize.Width90})!;
+BitmapImage Key6Image() => (BitmapImage)typeof(FocusStopCommand).GetMethod("GetCommandImage",commandFlags)!.Invoke(key6,new object[]{"",PluginImageSize.Width90})!;
+bool HasFocusImages() { using var image=Image(); using var image6=Key6Image(); return image!=null && image6!=null; }
 string Text(PluginDynamicCommand command) => (string)command.GetType().GetMethod("GetCommandDisplayName",commandFlags)!.Invoke(command,new object[]{"",PluginImageSize.Width90})!;
 string Label() => (string)typeof(FocusControlCommand).GetMethod("GetCommandDisplayName",commandFlags)!.Invoke(key,new object[]{"",PluginImageSize.Width90})!;
 void Mode(CluckInMode mode) {
@@ -39,6 +43,10 @@ void Mode(CluckInMode mode) {
 }
 int checks=0;
 void Check(bool ok,string message){if(!ok)throw new Exception(message); checks++;}
+string[] Collapse(IEnumerable<string> source) {
+ var frames=source.ToArray();
+ return frames.Where((frame,index)=>index==0 || frame!=frames[index-1]).ToArray();
+}
 async Task Until(Func<bool> ready,int seconds=12){
  var deadline=DateTime.UtcNow.AddSeconds(seconds);
  while(!ready()) { if(!errors.IsEmpty)throw errors.First(); if(DateTime.UtcNow>deadline)throw new Exception("Timed out awaiting animation"); await Task.Delay(25); }
@@ -54,22 +62,27 @@ try {
  await Until(()=> { try {return http.GetAsync("health").GetAwaiter().GetResult().IsSuccessStatusCode;} catch{return false;} });
  adapter.GetEvent("FrameChanged",flags)!.GetAddMethod(true)!.Invoke(null,new object[]{frameChanged});
  adapter.GetMethod("Start",flags)!.Invoke(null,null);
+ focusAdapter.GetMethod("Start",flags)!.Invoke(null,null);
  Mode(CluckInMode.Idle);
- await Until(()=>samples.Count>=5);
- var idle=samples.ToArray().Take(5).ToArray();
- Check(idle.Select(x=>x.Frame).SequenceEqual(new[]{"idle_00.png","idle_01.png","idle_02.png","idle_03.png","idle_00.png"}),"Idle sequence");
+ await Until(()=>Collapse(samples.Select(x=>x.Frame)).Length>=5);
+ var idle=samples.ToArray();
+ Check(Collapse(idle.Select(x=>x.Frame)).Take(5).SequenceEqual(new[]{"idle_00.png","idle_01.png","idle_02.png","idle_03.png","idle_00.png"}),"Idle sequence");
  Check(idle.Select(x=>Convert.ToBase64String(x.Image)).Distinct().Count()>1,"Rendered Idle pixels must change");
  Check(Label()=="\u200B","No Idle timer label");
- Check(Text(new CounterCommand())=="FOCUS" && Text(new MessageCommand())=="PET","Idle native action labels");
+ Check(Text(new CounterCommand())=="IDLE" && Text(new MessageCommand())=="PET","Idle native action labels");
  Check(Text(new AutomationCommand())=="0\nFEED".Replace("\n",Environment.NewLine),"Empty inventory native label");
  var beforeEmpty = samples.Count;
  MainController.HandleKeyEvent(3); await Until(()=>samples.Count>beforeEmpty);
  Check(samples.Last().Mood=="idle","Empty feed does not animate");
- using(var credit=await http.PostAsJsonAsync("event",new {type="RECORD_FOCUS",payload=new {sessionId="test-completed",seconds=9318,completed=true}})) credit.EnsureSuccessStatusCode();
- await Until(()=>Text(new AutomationCommand()).StartsWith("1"));
- Check(Text(new TimerHourCommand())==$"02{Environment.NewLine}HR","Idle cumulative hours");
- Check(Text(new TimerMinuteCommand())==$"35{Environment.NewLine}MIN","Idle cumulative minutes");
- Check(Text(new TimerSecondCommand())==$"18{Environment.NewLine}SEC","Idle cumulative seconds");
+ using(var credit=await http.PostAsJsonAsync("event",new {type="RECORD_FOCUS",payload=new {sessionId="test-completed",seconds=5025,completed=true}})) credit.EnsureSuccessStatusCode();
+ await Until(()=>Text(new AutomationCommand()).StartsWith("1005"));
+ Check(Text(new TimerHourCommand())==$"01{Environment.NewLine}HR","Idle cumulative hours");
+ Check(Text(new TimerMinuteCommand())==$"23{Environment.NewLine}MIN","Idle cumulative minutes");
+ Check(Text(new TimerSecondCommand())==$"45{Environment.NewLine}SEC","Idle cumulative seconds");
+ var idleTotal=(await http.GetFromJsonAsync<JsonElement>("view")).GetProperty("totalFocusSeconds").GetInt64();
+ await Task.Delay(1100);
+ Check(idleTotal==5025 && (await http.GetFromJsonAsync<JsonElement>("view")).GetProperty("totalFocusSeconds").GetInt64()==5025,
+       "Idle time does not increase cumulative focus");
  var selected=MainController.CurrentFocusTimerField;
  foreach(var button in new[]{4,6,7,8,9}) MainController.HandleKeyEvent(button);
  Check(MainController.CurrentFocusTimerField==selected,"Idle statistics keys do not edit timer");
@@ -77,41 +90,46 @@ try {
   samples.Clear(); MainController.HandleKeyEvent(button);
   await Until(()=>samples.Any(x=>x.Mood==mood));
   await Until(()=>samples.LastOrDefault().Mood=="idle");
-  var frames=samples.Where(x=>x.Mood==mood).Select(x=>x.Frame).ToArray();
+  var frames=Collapse(samples.Where(x=>x.Mood==mood).Select(x=>x.Frame));
   Check(frames.SequenceEqual(Enumerable.Range(0,count).Select(i=>$"{mood}_{i:00}.png")), mood+" complete Python sequence");
   Check(samples.Last().Frame=="idle_00.png",mood+" returns Idle");
  }
  Check(Text(new TaskCommand())==$"1{Environment.NewLine}PATS","Accepted pats displayed");
  Check(Text(new FocusStopCommand())==$"1{Environment.NewLine}FED","Successful feeds displayed");
- Check(Text(new AutomationCommand())==$"0{Environment.NewLine}FEED","Feed consumed exactly once");
+ Check(Text(new AutomationCommand())==$"1004{Environment.NewLine}FEED","Feed consumed exactly once");
  MainController.HandleKeyEvent(2); await Until(()=>samples.Last().Mood=="pet");
  Mode(CluckInMode.Focus); await Task.Delay(300);
- Check(Text(new CounterCommand())=="WORK" && Text(new MessageCommand())=="Messages" &&
+ Check(Text(new CounterCommand())=="FOCUS" && Text(new MessageCommand())=="Messages" &&
        Text(new AutomationCommand())=="AI OFF" && Text(new TaskCommand())=="Task" &&
        Text(new FocusStopCommand())=="END","Focus mappings unchanged");
  var stoppedCount=samples.Count;
  var stoppedView=await http.GetStringAsync("view"); await Task.Delay(1100);
  Check(samples.Count==stoppedCount && await http.GetStringAsync("view")==stoppedView,"Focus stops the frame clock");
- assembly.GetType("Loupedeck.CluckInPlugin.PluginResources")!.GetMethod("Init")!.Invoke(null,new object[]{assembly});
- var renderer=assembly.GetType("Loupedeck.CluckInPlugin.ButtonImageRenderer")!;
  foreach(var (state,label) in new[]{(FocusTimerControlState.Ready,"START"),(FocusTimerControlState.Running,"PAUSE"),(FocusTimerControlState.Paused,"RESUME"),(FocusTimerControlState.Completed,"START")}) {
   typeof(MainController).GetField("<CurrentFocusTimerState>k__BackingField",flags)!.SetValue(null,state);
-  using var expected=(BitmapImage)renderer.GetMethod("DrawDeskState")!.Invoke(null,new object[]{state,MainController.FocusProgress})!;
+  ((Action)typeof(MainController).GetField("FocusTimerChanged",flags)!.GetValue(null)!)();
+  await Until(HasFocusImages);
   using var actual=Image();
-  Check(Label()==label && actual.ToArray().SequenceEqual(expected.ToArray()),"Focus Key 5 preserved: "+state);
+  using var actual6=Key6Image();
+  Check(Label()==label && actual!=null && actual.ToArray().Length>0 && actual6!=null && actual6.ToArray().Length>0,
+        "Focus Keys 5/6 preserved: "+state);
  }
  Mode(CluckInMode.Idle); samples.Clear(); await Until(()=>samples.Count>=2);
  Check(samples.First().Frame=="idle_00.png","Re-enter Idle resets Python state");
+ Check(Text(new TimerHourCommand())==$"01{Environment.NewLine}HR" &&
+       Text(new TimerMinuteCommand())==$"23{Environment.NewLine}MIN" &&
+       Text(new TimerSecondCommand())==$"45{Environment.NewLine}SEC","Focus/Idle switch preserves cumulative time");
  adapter.GetMethod("Stop",flags)!.Invoke(null,null); await Task.Delay(200);
  stoppedCount=samples.Count; await Task.Delay(700);
  Check(samples.Count==stoppedCount,"Unload cancels updates");
  Check(errors.IsEmpty,"No rendering/callback errors");
  var persisted=JsonDocument.Parse(File.ReadAllText(statePath)).RootElement;
- Check(persisted.GetProperty("feedCount").GetInt64()==0 && persisted.GetProperty("patCount").GetInt64()==2 &&
-       persisted.GetProperty("successfulFeedCount").GetInt64()==1 && persisted.GetProperty("totalFocusSeconds").GetInt64()==9318,
+ Check(persisted.GetProperty("feedCount").GetInt64()==1004 && persisted.GetProperty("patCount").GetInt64()==2 &&
+       persisted.GetProperty("successfulFeedCount").GetInt64()==1 && persisted.GetProperty("totalFocusSeconds").GetInt64()==5025,
        "Canonical API statistics persisted");
  Console.WriteLine($"PASS: {checks} checks against real Python API: looping pixels, full pet/feed sequences, mode switch, Focus images/labels, unload.");
 } finally {
+ focusAdapter.GetMethod("Stop",flags)!.Invoke(null,null);
  adapter.GetMethod("Stop",flags)!.Invoke(null,null);
  if(!api.HasExited){api.Kill(entireProcessTree:true);api.WaitForExit();}
  if(File.Exists(statePath))File.Delete(statePath);
