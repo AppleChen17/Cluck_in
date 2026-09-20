@@ -17,8 +17,13 @@ def default_state_path() -> Path:
 class ChickenStatistics:
     def __init__(self, path: Path | None = None):
         self.path = path
-        self.data = {"feedCount": 0, "patCount": 0, "successfulFeedCount": 0,
-                     "totalFocusSeconds": 0, "focusSessions": {}}
+        self.data = {
+            "feedCount": 0,
+            "patCount": 0,
+            "successfulFeedCount": 0,
+            "totalFocusSeconds": 0,
+            "focusSessions": {},
+        }
         if path is not None and path.exists():
             self.data.update(json.loads(path.read_text(encoding="utf-8")))
             for key in ("feedCount", "patCount", "successfulFeedCount", "totalFocusSeconds"):
@@ -64,17 +69,70 @@ class ChickenStatistics:
     def record_focus(self, session_id, seconds, completed):
         if not isinstance(session_id, str) or not session_id or len(session_id) > 128:
             raise ValueError("A stable focus session ID is required")
+
         self._integer(seconds)
-        if type(completed) is not bool or (completed and seconds == 0):
+
+        if type(completed) is not bool:
             raise ValueError("Invalid focus completion")
-        previous = self.data["focusSessions"].get(session_id, {"seconds": 0, "completed": False})
-        maximum = max(seconds, previous["seconds"])
-        earned = completed and not previous["completed"]
-        if maximum == previous["seconds"] and not earned:
+
+        previous = self.data["focusSessions"].get(
+            session_id,
+            {
+                "seconds": 0,
+                "completed": False,
+            },
+        )
+
+        previous_seconds = self._integer(
+            previous.get("seconds", 0)
+        )
+
+        previous_completed = previous.get(
+            "completed",
+            False,
+        )
+
+        if type(previous_completed) is not bool:
+            raise ValueError(
+                "Invalid stored focus completion"
+            )
+
+        maximum = max(
+            seconds,
+            previous_seconds,
+        )
+
+        newly_completed = (
+            completed
+            and not previous_completed
+        )
+
+        if (
+            maximum == previous_seconds
+            and not newly_completed
+        ):
             return
+
         data = copy.deepcopy(self.data)
-        data["totalFocusSeconds"] += maximum - previous["seconds"]
-        data["feedCount"] += int(earned)
+
+        added_seconds = (
+            maximum - previous_seconds
+        )
+
+        data["totalFocusSeconds"] += added_seconds
+
+        previous_rewards = previous_seconds // 5
+        current_rewards = maximum // 5
+        earned = current_rewards - previous_rewards
+
+        data["feedCount"] += earned
+
         data["focusSessions"][session_id] = {
-            "seconds": maximum, "completed": completed or previous["completed"]}
+            "seconds": maximum,
+            "completed": (
+                completed
+                or previous_completed
+            ),
+        }
+
         self._commit(data)
